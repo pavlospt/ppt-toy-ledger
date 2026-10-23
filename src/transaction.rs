@@ -80,3 +80,192 @@ impl TryFrom<RawRecord<'_>> for Transaction {
         todo!()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn raw<'a>(kind: &'a str, amount: Option<&'a str>) -> RawRecord<'a> {
+        RawRecord {
+            kind,
+            client: 7,
+            tx: 42,
+            amount,
+        }
+    }
+
+    fn amount(s: &str) -> Amount {
+        s.parse().unwrap()
+    }
+
+    const CLIENT: ClientId = ClientId(7);
+    const TX: TxId = TxId(42);
+
+    #[test]
+    fn converts_deposit() {
+        assert_eq!(
+            Transaction::try_from(raw("deposit", Some("1.5"))),
+            Ok(Transaction::Deposit {
+                client: CLIENT,
+                tx: TX,
+                amount: amount("1.5"),
+            })
+        );
+    }
+
+    #[test]
+    fn converts_withdrawal() {
+        assert_eq!(
+            Transaction::try_from(raw("withdrawal", Some("0.0001"))),
+            Ok(Transaction::Withdrawal {
+                client: CLIENT,
+                tx: TX,
+                amount: amount("0.0001"),
+            })
+        );
+    }
+
+    #[test]
+    fn converts_dispute_family_without_amount() {
+        assert_eq!(
+            Transaction::try_from(raw("dispute", None)),
+            Ok(Transaction::Dispute {
+                client: CLIENT,
+                tx: TX
+            })
+        );
+        assert_eq!(
+            Transaction::try_from(raw("resolve", None)),
+            Ok(Transaction::Resolve {
+                client: CLIENT,
+                tx: TX
+            })
+        );
+        assert_eq!(
+            Transaction::try_from(raw("chargeback", None)),
+            Ok(Transaction::Chargeback {
+                client: CLIENT,
+                tx: TX
+            })
+        );
+    }
+
+    #[test]
+    fn treats_blank_amount_as_absent() {
+        assert_eq!(
+            Transaction::try_from(raw("dispute", Some(""))),
+            Ok(Transaction::Dispute {
+                client: CLIENT,
+                tx: TX
+            })
+        );
+        assert_eq!(
+            Transaction::try_from(raw("deposit", Some("  "))),
+            Err(ParseError::MissingAmount("deposit"))
+        );
+    }
+
+    #[test]
+    fn rejects_deposit_or_withdrawal_without_amount() {
+        assert_eq!(
+            Transaction::try_from(raw("deposit", None)),
+            Err(ParseError::MissingAmount("deposit"))
+        );
+        assert_eq!(
+            Transaction::try_from(raw("withdrawal", None)),
+            Err(ParseError::MissingAmount("withdrawal"))
+        );
+    }
+
+    #[test]
+    fn rejects_dispute_family_with_amount() {
+        for kind in ["dispute", "resolve", "chargeback"] {
+            assert_eq!(
+                Transaction::try_from(raw(kind, Some("1.0"))),
+                Err(ParseError::UnexpectedAmount(kind)),
+                "{kind}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_zero_and_negative_amounts() {
+        for kind in ["deposit", "withdrawal"] {
+            for value in ["0", "0.0000", "-1", "-0.0001"] {
+                assert_eq!(
+                    Transaction::try_from(raw(kind, Some(value))),
+                    Err(ParseError::NonPositiveAmount),
+                    "{kind} {value}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_amounts() {
+        assert_eq!(
+            Transaction::try_from(raw("deposit", Some("1.23456"))),
+            Err(ParseError::InvalidAmount(AmountError::TooManyDecimals))
+        );
+        assert_eq!(
+            Transaction::try_from(raw("withdrawal", Some("abc"))),
+            Err(ParseError::InvalidAmount(AmountError::InvalidFormat))
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_types_case_sensitively() {
+        for kind in ["transfer", "Deposit", "DISPUTE", ""] {
+            assert_eq!(
+                Transaction::try_from(raw(kind, Some("1"))),
+                Err(ParseError::UnknownType(kind.to_string())),
+                "{kind:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn accepts_full_id_ranges() {
+        let record = RawRecord {
+            kind: "deposit",
+            client: u16::MAX,
+            tx: u32::MAX,
+            amount: Some("1"),
+        };
+        let tx = Transaction::try_from(record).unwrap();
+        assert_eq!(tx.client(), ClientId(u16::MAX));
+        assert_eq!(tx.tx(), TxId(u32::MAX));
+    }
+
+    #[test]
+    fn exposes_client_and_tx_for_every_variant() {
+        let all = [
+            Transaction::Deposit {
+                client: CLIENT,
+                tx: TX,
+                amount: amount("1"),
+            },
+            Transaction::Withdrawal {
+                client: CLIENT,
+                tx: TX,
+                amount: amount("1"),
+            },
+            Transaction::Dispute {
+                client: CLIENT,
+                tx: TX,
+            },
+            Transaction::Resolve {
+                client: CLIENT,
+                tx: TX,
+            },
+            Transaction::Chargeback {
+                client: CLIENT,
+                tx: TX,
+            },
+        ];
+        for tx in all {
+            assert_eq!(tx.client(), CLIENT, "{tx:?}");
+            assert_eq!(tx.tx(), TX, "{tx:?}");
+        }
+    }
+}

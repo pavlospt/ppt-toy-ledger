@@ -59,3 +59,144 @@ impl fmt::Display for Amount {
         todo!()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn parse(s: &str) -> Result<Amount, AmountError> {
+        s.parse()
+    }
+
+    fn scaled(units: i64) -> Amount {
+        Amount::from_scaled(units)
+    }
+
+    #[test]
+    fn parses_whole_and_fractional_values() {
+        assert_eq!(parse("1"), Ok(scaled(10_000)));
+        assert_eq!(parse("0"), Ok(Amount::ZERO));
+        assert_eq!(parse("1.5"), Ok(scaled(15_000)));
+        assert_eq!(parse("1.2345"), Ok(scaled(12_345)));
+        assert_eq!(parse("0.0001"), Ok(scaled(1)));
+        assert_eq!(parse("007.10"), Ok(scaled(71_000)));
+    }
+
+    #[test]
+    fn parses_bare_trailing_or_leading_point() {
+        assert_eq!(parse("1."), Ok(scaled(10_000)));
+        assert_eq!(parse(".5"), Ok(scaled(5_000)));
+    }
+
+    #[test]
+    fn parses_negative_values() {
+        assert_eq!(parse("-1.5"), Ok(scaled(-15_000)));
+        assert_eq!(parse("-.5"), Ok(scaled(-5_000)));
+        assert_eq!(parse("-0"), Ok(Amount::ZERO));
+    }
+
+    #[test]
+    fn trims_surrounding_whitespace() {
+        assert_eq!(parse("  2.5 "), Ok(scaled(25_000)));
+        assert_eq!(parse("\t3\t"), Ok(scaled(30_000)));
+    }
+
+    #[test]
+    fn parses_range_bounds() {
+        assert_eq!(parse("922337203685477.5807"), Ok(scaled(i64::MAX)));
+        assert_eq!(parse("-922337203685477.5808"), Ok(scaled(i64::MIN)));
+    }
+
+    #[test]
+    fn rejects_values_beyond_range() {
+        assert_eq!(parse("922337203685477.5808"), Err(AmountError::Overflow));
+        assert_eq!(parse("-922337203685477.5809"), Err(AmountError::Overflow));
+        assert_eq!(parse("99999999999999999999"), Err(AmountError::Overflow));
+    }
+
+    #[test]
+    fn rejects_more_than_four_decimals() {
+        assert_eq!(parse("1.23456"), Err(AmountError::TooManyDecimals));
+        assert_eq!(parse("0.00001"), Err(AmountError::TooManyDecimals));
+        assert_eq!(parse("1.00000"), Err(AmountError::TooManyDecimals));
+    }
+
+    #[test]
+    fn rejects_empty_input() {
+        assert_eq!(parse(""), Err(AmountError::Empty));
+        assert_eq!(parse("   "), Err(AmountError::Empty));
+    }
+
+    #[test]
+    fn rejects_malformed_input() {
+        for input in [
+            ".", "-", "-.", "+1", "1e3", "1 .5", "1. 5", "1.2.3", "abc", "--1", "1,5", "0x10",
+            "1-", "١", "- 1",
+        ] {
+            assert_eq!(parse(input), Err(AmountError::InvalidFormat), "{input:?}");
+        }
+    }
+
+    #[test]
+    fn formats_with_exactly_four_decimals() {
+        assert_eq!(Amount::ZERO.to_string(), "0.0000");
+        assert_eq!(scaled(1).to_string(), "0.0001");
+        assert_eq!(scaled(15_000).to_string(), "1.5000");
+        assert_eq!(scaled(12_345_678).to_string(), "1234.5678");
+    }
+
+    #[test]
+    fn formats_negative_values() {
+        assert_eq!(scaled(-2_500).to_string(), "-0.2500");
+        assert_eq!(scaled(-15_000).to_string(), "-1.5000");
+    }
+
+    #[test]
+    fn formats_range_bounds() {
+        assert_eq!(scaled(i64::MAX).to_string(), "922337203685477.5807");
+        assert_eq!(scaled(i64::MIN).to_string(), "-922337203685477.5808");
+    }
+
+    #[test]
+    fn checked_add_detects_overflow() {
+        assert_eq!(scaled(1).checked_add(scaled(2)), Some(scaled(3)));
+        assert_eq!(scaled(-5).checked_add(scaled(2)), Some(scaled(-3)));
+        assert_eq!(scaled(i64::MAX).checked_add(scaled(1)), None);
+        assert_eq!(scaled(i64::MIN).checked_add(scaled(-1)), None);
+    }
+
+    #[test]
+    fn checked_sub_detects_overflow_and_allows_negative_results() {
+        assert_eq!(scaled(3).checked_sub(scaled(2)), Some(scaled(1)));
+        assert_eq!(scaled(2).checked_sub(scaled(3)), Some(scaled(-1)));
+        assert_eq!(scaled(i64::MIN).checked_sub(scaled(1)), None);
+        assert_eq!(scaled(i64::MAX).checked_sub(scaled(-1)), None);
+    }
+
+    #[test]
+    fn is_positive_excludes_zero_and_negatives() {
+        assert!(scaled(1).is_positive());
+        assert!(!Amount::ZERO.is_positive());
+        assert!(!scaled(-1).is_positive());
+    }
+
+    proptest! {
+        #[test]
+        fn format_then_parse_round_trips(units in any::<i64>()) {
+            let amount = scaled(units);
+            prop_assert_eq!(parse(&amount.to_string()), Ok(amount));
+        }
+
+        #[test]
+        fn parse_never_panics(input in any::<String>()) {
+            let _ = parse(&input);
+        }
+
+        #[test]
+        fn parse_accepts_any_four_decimal_number(whole in 0u64..1_000_000_000, frac in 0u32..10_000) {
+            let expected = scaled(whole as i64 * 10_000 + i64::from(frac));
+            prop_assert_eq!(parse(&format!("{whole}.{frac:04}")), Ok(expected));
+        }
+    }
+}
