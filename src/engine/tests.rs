@@ -118,6 +118,17 @@ mod state_machine {
     }
 }
 
+mod memory {
+    use super::*;
+
+    // Every accepted deposit is kept for possible disputes, so this entry
+    // size is what the store costs per transaction at scale.
+    #[test]
+    fn stored_deposit_entries_take_16_bytes() {
+        assert_eq!(std::mem::size_of::<(TxId, Deposit)>(), 16);
+    }
+}
+
 mod accounts {
     use super::*;
 

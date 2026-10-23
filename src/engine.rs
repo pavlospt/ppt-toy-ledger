@@ -79,10 +79,29 @@ impl TxState {
 // Withdrawals cannot be disputed because the specified mechanics (move funds
 // from available to held) describe reversing incoming money; a withdrawal
 // dispute would need a hold of the opposite sign.
+//
+// Why `repr(C, packed(4))`:
+// - Every accepted deposit stays in memory in case it is disputed, so the
+//   size of a map entry is the store's cost per transaction (docs/scale.md).
+//   Packing to 4-byte alignment stops the 8-byte `amount` from forcing the
+//   value to 8-byte alignment and 16 bytes, so an entry (a u32 key plus this
+//   value) takes 16 bytes instead of 24: a third less memory.
+// - `C` fixes the declared field order. With `packed` alone the compiler may
+//   reorder fields, so the 8 + 2 + 1 byte layout (amount first, with no
+//   padding in front of it) would hold by accident rather than by contract.
+//   Clippy's `repr_packed_without_abi` lint asks for the explicit `C` for the
+//   same reason, and `stored_deposit_entries_take_16_bytes` pins the size.
+// - Simpler-looking options cost more: without packing the entry stays at 24
+//   bytes, and splitting the amount into two u32 halves or keying a set by a
+//   field of the value would spread the trick through more code.
+// - The price is an under-aligned `amount`. The compiler rejects references
+//   to it, so fields are only ever copied in and out, which is all this
+//   struct needs; unaligned 8-byte loads are cheap on x86-64 and aarch64.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(C, packed(4))]
 struct Deposit {
-    client: ClientId,
     amount: Amount,
+    client: ClientId,
     state: TxState,
 }
 
@@ -126,8 +145,8 @@ impl Engine {
         }
         account.deposit(amount)?;
         let deposit = Deposit {
-            client,
             amount,
+            client,
             state: TxState::Processed,
         };
         self.deposits.insert(tx, deposit);
