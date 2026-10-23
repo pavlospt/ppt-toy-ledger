@@ -39,11 +39,23 @@ pub enum Transaction {
 
 impl Transaction {
     pub fn client(&self) -> ClientId {
-        todo!()
+        match *self {
+            Transaction::Deposit { client, .. }
+            | Transaction::Withdrawal { client, .. }
+            | Transaction::Dispute { client, .. }
+            | Transaction::Resolve { client, .. }
+            | Transaction::Chargeback { client, .. } => client,
+        }
     }
 
     pub fn tx(&self) -> TxId {
-        todo!()
+        match *self {
+            Transaction::Deposit { tx, .. }
+            | Transaction::Withdrawal { tx, .. }
+            | Transaction::Dispute { tx, .. }
+            | Transaction::Resolve { tx, .. }
+            | Transaction::Chargeback { tx, .. } => tx,
+        }
     }
 }
 
@@ -77,7 +89,54 @@ impl TryFrom<RawRecord<'_>> for Transaction {
     type Error = ParseError;
 
     fn try_from(raw: RawRecord<'_>) -> Result<Self, Self::Error> {
-        todo!()
+        let client = ClientId(raw.client);
+        let tx = TxId(raw.tx);
+        // A blank field and a missing column mean the same thing: no amount.
+        let amount = raw.amount.map(str::trim).filter(|value| !value.is_empty());
+
+        // Type names are matched exactly; guessing at near-misses such as
+        // "Deposit" would mean accepting input the format does not define.
+        match raw.kind {
+            "deposit" => Ok(Transaction::Deposit {
+                client,
+                tx,
+                amount: positive_amount("deposit", amount)?,
+            }),
+            "withdrawal" => Ok(Transaction::Withdrawal {
+                client,
+                tx,
+                amount: positive_amount("withdrawal", amount)?,
+            }),
+            "dispute" => {
+                no_amount("dispute", amount)?;
+                Ok(Transaction::Dispute { client, tx })
+            }
+            "resolve" => {
+                no_amount("resolve", amount)?;
+                Ok(Transaction::Resolve { client, tx })
+            }
+            "chargeback" => {
+                no_amount("chargeback", amount)?;
+                Ok(Transaction::Chargeback { client, tx })
+            }
+            other => Err(ParseError::UnknownType(other.to_string())),
+        }
+    }
+}
+
+fn positive_amount(kind: &'static str, amount: Option<&str>) -> Result<Amount, ParseError> {
+    let amount: Amount = amount.ok_or(ParseError::MissingAmount(kind))?.parse()?;
+    if amount.is_positive() {
+        Ok(amount)
+    } else {
+        Err(ParseError::NonPositiveAmount)
+    }
+}
+
+fn no_amount(kind: &'static str, amount: Option<&str>) -> Result<(), ParseError> {
+    match amount {
+        Some(_) => Err(ParseError::UnexpectedAmount(kind)),
+        None => Ok(()),
     }
 }
 
