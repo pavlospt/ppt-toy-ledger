@@ -6,6 +6,11 @@ use crate::account::Account;
 use crate::amount::Amount;
 use crate::transaction::{ClientId, Transaction, TxId};
 
+#[cfg(test)]
+mod proptests;
+#[cfg(test)]
+mod tests;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 pub enum EngineError {
     #[error("insufficient available funds")]
