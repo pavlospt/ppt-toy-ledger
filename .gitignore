@@ -1,0 +1,10 @@
+/target
+
+# Challenge documents must never be committed.
+*.pdf
+
+# Local tooling state
+.claude/
+
+# Generated large inputs for manual memory checks
+/large*.csv
