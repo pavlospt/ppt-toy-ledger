@@ -1,4 +1,4 @@
-# ppt-ledger
+# ppt-toy-ledger
 
 A streaming payments engine. It reads a CSV of transactions, applies deposits,
 withdrawals, disputes, resolves and chargebacks to client accounts, and prints

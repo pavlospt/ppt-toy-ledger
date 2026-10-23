@@ -15,7 +15,7 @@ fn fixture(name: &str) -> PathBuf {
 }
 
 fn ledger_binary() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_ppt-ledger"))
+    Command::new(env!("CARGO_BIN_EXE_ppt-toy-ledger"))
 }
 
 // Output row order is unspecified, so rows are compared as a sorted set with

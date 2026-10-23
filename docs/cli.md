@@ -6,7 +6,7 @@ code is in `src/main.rs` and `src/io.rs`.
 ## Invocation
 
 ```sh
-ppt-ledger <transactions.csv> > accounts.csv
+ppt-toy-ledger <transactions.csv> > accounts.csv
 ```
 
 Exactly one argument, the input path. Any other argument count is a usage

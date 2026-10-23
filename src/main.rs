@@ -18,7 +18,7 @@ use crate::io::{ReadError, Row, TransactionReader};
 
 #[derive(Debug, Error)]
 enum AppError {
-    #[error("usage: ppt-ledger <transactions.csv>")]
+    #[error("usage: ppt-toy-ledger <transactions.csv>")]
     Usage,
     #[error("cannot open {}: {source}", .path.display())]
     Open {

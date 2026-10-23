@@ -4,7 +4,7 @@ Read this first, before changing anything in this repository.
 
 ## What this is
 
-`ppt-ledger` is a single Rust binary crate, with no library target. It streams a
+`ppt-toy-ledger` is a single Rust binary crate, with no library target. It streams a
 CSV of transactions through an in-memory engine and prints each client's
 account as CSV. The toolchain is pinned to Rust 1.99.1 in `rust-toolchain.toml`.
 

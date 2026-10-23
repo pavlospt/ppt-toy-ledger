@@ -76,7 +76,7 @@ change and before the 16-byte entry change (which mainly cut memory):
 ```sh
 cargo build --release
 cargo run --release --example generate -- 10000000 > large.csv   # mixed input
-/usr/bin/time -l ./target/release/ppt-ledger large.csv > /dev/null 2>/dev/null
+/usr/bin/time -l ./target/release/ppt-toy-ledger large.csv > /dev/null 2>/dev/null
 ```
 
 For the worst-case input (10 M deposits):
