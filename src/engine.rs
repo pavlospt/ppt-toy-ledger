@@ -181,7 +181,7 @@ fn apply_dispute_action(
     let next = deposit.state.transition(action)?;
     match action {
         DisputeAction::Dispute => account.hold(deposit.amount)?,
-        DisputeAction::Resolve => todo!(),
+        DisputeAction::Resolve => account.release(deposit.amount)?,
         DisputeAction::Chargeback => todo!(),
     }
     deposit.state = next;

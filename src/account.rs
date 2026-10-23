@@ -57,7 +57,10 @@ impl Account {
     }
 
     pub fn release(&mut self, amount: Amount) -> Result<(), EngineError> {
-        todo!()
+        self.commit(
+            self.available.checked_add(amount),
+            self.held.checked_sub(amount),
+        )
     }
 
     pub fn charge_back(&mut self, amount: Amount) -> Result<(), EngineError> {
