@@ -4,9 +4,7 @@ mod generator;
 use std::fs::{self, File};
 use std::io::BufWriter;
 use std::path::{Path, PathBuf};
-
-use assert_cmd::Command;
-use assert_cmd::cargo::cargo_bin_cmd;
+use std::process::Command;
 
 const HEADER: &str = "client,available,held,total,locked";
 
@@ -17,7 +15,7 @@ fn fixture(name: &str) -> PathBuf {
 }
 
 fn engine() -> Command {
-    cargo_bin_cmd!("ppt-ledger")
+    Command::new(env!("CARGO_BIN_EXE_ppt-ledger"))
 }
 
 // Output row order is unspecified, so rows are compared as a sorted set with
