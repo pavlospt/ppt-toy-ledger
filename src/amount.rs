@@ -27,6 +27,7 @@ const DECIMALS: usize = 4;
 const SCALE: u64 = 10_000;
 
 impl Amount {
+    #[cfg(test)]
     pub const ZERO: Amount = Amount(0);
 
     #[cfg(test)]

@@ -1,7 +1,3 @@
-// Skeleton stage: most items are only reachable once `run` is implemented.
-// Removed in the final implementation slice.
-#![allow(dead_code, unused_variables)]
-
 mod account;
 mod amount;
 mod engine;
@@ -9,10 +5,15 @@ mod io;
 mod transaction;
 
 use std::ffi::OsString;
+use std::fs::File;
+use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 use thiserror::Error;
+
+use crate::engine::Engine;
+use crate::io::{ReadError, TransactionReader};
 
 #[derive(Debug, Error)]
 enum AppError {
@@ -34,7 +35,10 @@ enum AppError {
 
 impl AppError {
     fn exit_code(&self) -> ExitCode {
-        todo!()
+        match self {
+            AppError::Usage => ExitCode::from(2),
+            _ => ExitCode::FAILURE,
+        }
     }
 }
 
@@ -48,6 +52,40 @@ fn main() -> ExitCode {
     }
 }
 
-fn run(args: impl Iterator<Item = OsString>) -> Result<(), AppError> {
-    todo!()
+fn run(mut args: impl Iterator<Item = OsString>) -> Result<(), AppError> {
+    let (Some(path), None) = (args.next(), args.next()) else {
+        return Err(AppError::Usage);
+    };
+    let path = PathBuf::from(path);
+    let file = File::open(&path).map_err(|source| AppError::Open {
+        path: path.clone(),
+        source,
+    })?;
+    let mut transactions = TransactionReader::new(file)?;
+    let mut engine = Engine::new();
+
+    // Diagnostics are best effort: a closed or failing stderr must not stop
+    // the ledger from being processed, so write errors there are ignored.
+    let mut diagnostics = BufWriter::new(std::io::stderr().lock());
+    while let Some(result) = transactions.next() {
+        match result {
+            Ok(tx) => {
+                if let Err(error) = engine.apply(tx) {
+                    let _ = writeln!(
+                        diagnostics,
+                        "line {}: transaction {} rejected: {error}",
+                        transactions.line(),
+                        tx.tx().0
+                    );
+                }
+            }
+            Err(error @ ReadError::Row { .. }) => {
+                let _ = writeln!(diagnostics, "{error}");
+            }
+            Err(error @ ReadError::Io(_)) => return Err(AppError::Read(error)),
+        }
+    }
+    let _ = diagnostics.flush();
+
+    io::write_accounts(std::io::stdout().lock(), engine.accounts()).map_err(AppError::Write)
 }

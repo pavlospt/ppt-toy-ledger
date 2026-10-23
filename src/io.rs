@@ -4,7 +4,7 @@ use csv::StringRecord;
 use thiserror::Error;
 
 use crate::account::Account;
-use crate::transaction::{ClientId, ParseError, Transaction};
+use crate::transaction::{ClientId, ParseError, RawRecord, Transaction};
 
 pub const REQUIRED_COLUMNS: [&str; 4] = ["type", "client", "tx", "amount"];
 
@@ -30,7 +30,7 @@ pub enum ReadError {
 pub enum RowError {
     #[error("malformed record: {0}")]
     Malformed(#[source] csv::Error),
-    #[error("expected at most 4 fields, found {0}")]
+    #[error("row has {0} fields, more than the header")]
     TooManyFields(usize),
     #[error(transparent)]
     Invalid(#[from] ParseError),
@@ -40,11 +40,47 @@ pub struct TransactionReader<R: Read> {
     reader: csv::Reader<R>,
     headers: StringRecord,
     record: StringRecord,
+    finished: bool,
 }
 
 impl<R: Read> TransactionReader<R> {
     pub fn new(input: R) -> Result<Self, HeaderError> {
-        todo!()
+        let mut reader = csv::ReaderBuilder::new()
+            .trim(csv::Trim::All)
+            .flexible(true)
+            .from_reader(input);
+        let headers = reader.headers().map_err(HeaderError::Read)?.clone();
+        // A wrong header would misread every row, so it is fatal rather than
+        // a per-row problem.
+        if let Some(missing) = REQUIRED_COLUMNS
+            .into_iter()
+            .find(|column| !headers.iter().any(|header| header == *column))
+        {
+            return Err(HeaderError::MissingColumn(missing));
+        }
+        Ok(Self {
+            reader,
+            headers,
+            record: StringRecord::new(),
+            finished: false,
+        })
+    }
+
+    // The input line on which the most recently read row starts, so callers
+    // can report problems found after parsing.
+    pub fn line(&self) -> u64 {
+        self.record.position().map_or(0, csv::Position::line)
+    }
+
+    fn parse_record(&self) -> Result<Transaction, RowError> {
+        if self.record.len() > self.headers.len() {
+            return Err(RowError::TooManyFields(self.record.len()));
+        }
+        let raw: RawRecord<'_> = self
+            .record
+            .deserialize(Some(&self.headers))
+            .map_err(RowError::Malformed)?;
+        Ok(Transaction::try_from(raw)?)
     }
 }
 
@@ -52,7 +88,32 @@ impl<R: Read> Iterator for TransactionReader<R> {
     type Item = Result<Transaction, ReadError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        todo!()
+        if self.finished {
+            return None;
+        }
+        // One record buffer is reused for the whole stream, so steady-state
+        // reading does not allocate per row.
+        match self.reader.read_record(&mut self.record) {
+            Ok(false) => {
+                self.finished = true;
+                None
+            }
+            Ok(true) => Some(self.parse_record().map_err(|reason| ReadError::Row {
+                line: self.line(),
+                reason,
+            })),
+            Err(error) if matches!(error.kind(), csv::ErrorKind::Io(_)) => {
+                self.finished = true;
+                Some(Err(ReadError::Io(error)))
+            }
+            Err(error) => {
+                let line = error.position().map_or(0, csv::Position::line);
+                Some(Err(ReadError::Row {
+                    line,
+                    reason: RowError::Malformed(error),
+                }))
+            }
+        }
     }
 }
 
@@ -62,7 +123,22 @@ pub fn write_accounts<'a, W: Write>(
     output: W,
     accounts: impl IntoIterator<Item = (ClientId, &'a Account)>,
 ) -> Result<(), csv::Error> {
-    todo!()
+    let mut rows: Vec<_> = accounts.into_iter().collect();
+    rows.sort_unstable_by_key(|(client, _)| *client);
+
+    let mut writer = csv::Writer::from_writer(output);
+    writer.write_record(["client", "available", "held", "total", "locked"])?;
+    for (client, account) in rows {
+        writer.write_record([
+            client.0.to_string(),
+            account.available().to_string(),
+            account.held().to_string(),
+            account.total().to_string(),
+            account.is_locked().to_string(),
+        ])?;
+    }
+    writer.flush()?;
+    Ok(())
 }
 
 #[cfg(test)]

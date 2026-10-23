@@ -150,6 +150,7 @@ impl Engine {
         }
     }
 
+    #[cfg(test)]
     pub fn account(&self, client: ClientId) -> Option<&Account> {
         self.accounts.get(&client)
     }
