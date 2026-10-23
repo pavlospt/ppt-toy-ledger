@@ -16,15 +16,19 @@ account as CSV. The toolchain is pinned to Rust 1.99.1 in `rust-toolchain.toml`.
 | Run | `cargo run --release -- <input.csv> > accounts.csv` |
 | Format check | `cargo fmt --check` |
 | Lint | `cargo clippy --all-targets -- -D warnings` |
-| Test (all, parallel) | `cargo nextest run` |
-| Test (one module) | `cargo nextest run -E 'test(/^engine::/)'` |
-| Test (as CI does) | `cargo nextest run --profile ci` |
-| Large-input test | `cargo nextest run --release --run-ignored only -E 'test(large_input)'` |
+| Test | `cargo test` |
+| Test (one module) | `cargo test engine::` |
+| Test (as CI does, incl. ignored) | `cargo test --all -- --include-ignored` |
+| Large-input test only | `cargo test --release --test cli -- --ignored large_input` |
+| Same, with nextest (optional) | `cargo nextest run --profile ci --all --run-ignored all` |
 | Generate N rows | `cargo run --release --example generate -- N > large.csv` |
 
-A change is done only when the format check, the lint and `cargo nextest run`
-all pass. If cargo-nextest isn't installed, run
-`cargo install --locked cargo-nextest`, or fall back to `cargo test`.
+A change is done only when the format check, the lint and `cargo test` all
+pass. The suite must also pass under cargo-nextest, which CI runs as well:
+keep tests independent of each other and of the order they run in, since
+nextest runs each one in its own process. Install it with
+`cargo install --locked cargo-nextest`; `docs/testing.md` lists the
+equivalent commands.
 
 ## Where things are
 

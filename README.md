@@ -15,25 +15,16 @@ output format and exit codes are described in [docs/cli.md](docs/cli.md).
 
 ## Test
 
-The test suite runs on [cargo-nextest](https://nexte.st), which runs every
-test in its own process, in parallel across all cores.
-
-Install it once:
-
-```sh
-cargo install --locked cargo-nextest
-```
-
 Run the suite (unit, property and end-to-end tests):
 
 ```sh
-cargo nextest run
+cargo test
 ```
 
-Run the million-row streaming test, which is skipped by default:
+Also run the million-row streaming test, which is skipped by default:
 
 ```sh
-cargo nextest run --release --run-ignored only -E 'test(large_input)'
+cargo test -- --include-ignored
 ```
 
 Run the same checks as CI:
@@ -41,12 +32,33 @@ Run the same checks as CI:
 ```sh
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
-cargo nextest run --profile ci
+cargo test --all -- --include-ignored
 ```
 
+<details>
+<summary>Running the tests with cargo-nextest (optional)</summary>
+
+The suite also runs under [cargo-nextest](https://nexte.st), which runs every
+test in its own process, in parallel across all cores. CI runs the suite with
+both runners and expects both to pass.
+
+Install it once:
+
+```sh
+cargo install --locked cargo-nextest
+```
+
+| Goal | Command |
+|---|---|
+| Run the suite | `cargo nextest run` |
+| Include the million-row test | `cargo nextest run --run-ignored all` |
+| Only the million-row test, in release mode | `cargo nextest run --release --run-ignored only -E 'test(large_input)'` |
+| As CI does | `cargo nextest run --profile ci --all --run-ignored all` |
+
 The `ci` profile, defined in [.config/nextest.toml](.config/nextest.toml),
-reports every failure instead of stopping at the first. Plain `cargo test`
-still works if nextest isn't installed.
+reports every failure instead of stopping at the first.
+
+</details>
 
 ## Documentation
 

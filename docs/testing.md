@@ -4,20 +4,21 @@ How the test suite is organised, how to run it, and how to extend it.
 
 ## Running
 
-The suite runs on cargo-nextest. Each test runs in its own process, in
-parallel. The configuration is in `.config/nextest.toml`.
+The default runner is `cargo test`. The suite also runs under cargo-nextest,
+which runs each test in its own process, in parallel; its configuration is in
+`.config/nextest.toml`. CI runs every test, including ignored ones, under both
+runners and expects both to pass. Tests must not depend on shared state or run
+order, so they behave the same under either runner.
 
-| Goal | Command |
-|---|---|
-| Everything (default) | `cargo nextest run` |
-| As CI does (no fail-fast) | `cargo nextest run --profile ci` |
-| One module | `cargo nextest run -E 'test(/^engine::/)'` |
-| One test | `cargo nextest run -E 'test(=engine::tests::disputes::double_dispute_is_ignored)'` |
-| CLI tests only | `cargo nextest run -E 'binary(cli)'` |
-| Large input (ignored by default) | `cargo nextest run --release --run-ignored only -E 'test(large_input)'` |
-| More property-test cases | `PROPTEST_CASES=5000 cargo nextest run --release -E 'test(/proptests/)'` |
-
-Without nextest, `cargo test` runs the same tests serially within each binary.
+| Goal | `cargo test` | `cargo nextest` |
+|---|---|---|
+| Everything except ignored | `cargo test` | `cargo nextest run` |
+| As CI does (incl. ignored) | `cargo test --all -- --include-ignored` | `cargo nextest run --profile ci --all --run-ignored all` |
+| One module | `cargo test engine::` | `cargo nextest run -E 'test(/^engine::/)'` |
+| One test | `cargo test engine::tests::disputes::double_dispute_is_ignored -- --exact` | `cargo nextest run -E 'test(=engine::tests::disputes::double_dispute_is_ignored)'` |
+| CLI tests only | `cargo test --test cli` | `cargo nextest run -E 'binary(cli)'` |
+| Large input only (release) | `cargo test --release --test cli -- --ignored large_input` | `cargo nextest run --release --run-ignored only -E 'test(large_input)'` |
+| More property-test cases | `PROPTEST_CASES=5000 cargo test --release proptests` | `PROPTEST_CASES=5000 cargo nextest run --release -E 'test(/proptests/)'` |
 
 ## Layers
 
