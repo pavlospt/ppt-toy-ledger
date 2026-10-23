@@ -14,7 +14,7 @@ fn fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
-fn engine() -> Command {
+fn ledger_binary() -> Command {
     Command::new(env!("CARGO_BIN_EXE_ppt-ledger"))
 }
 
@@ -32,7 +32,7 @@ fn normalize(csv: &str) -> (String, Vec<Vec<String>>) {
 
 #[track_caller]
 fn assert_fixture(name: &str) -> String {
-    let output = engine()
+    let output = ledger_binary()
         .arg(fixture(&format!("{name}.csv")))
         .output()
         .unwrap();
@@ -161,7 +161,7 @@ mod fatal_errors {
 
     #[test]
     fn missing_argument_is_a_usage_error() {
-        let output = engine().output().unwrap();
+        let output = ledger_binary().output().unwrap();
         assert_eq!(output.status.code(), Some(2));
         assert!(output.stdout.is_empty());
         assert!(String::from_utf8_lossy(&output.stderr).contains("usage"));
@@ -169,7 +169,7 @@ mod fatal_errors {
 
     #[test]
     fn extra_arguments_are_a_usage_error() {
-        let output = engine()
+        let output = ledger_binary()
             .arg(fixture("basic.csv"))
             .arg(fixture("basic.csv"))
             .output()
@@ -180,7 +180,7 @@ mod fatal_errors {
 
     #[test]
     fn unreadable_file_exits_with_failure() {
-        let output = engine()
+        let output = ledger_binary()
             .arg(fixture("does_not_exist.csv"))
             .output()
             .unwrap();
@@ -191,14 +191,20 @@ mod fatal_errors {
 
     #[test]
     fn bad_header_exits_with_failure() {
-        let output = engine().arg(fixture("bad_header.csv")).output().unwrap();
+        let output = ledger_binary()
+            .arg(fixture("bad_header.csv"))
+            .output()
+            .unwrap();
         assert_eq!(output.status.code(), Some(1));
         assert!(output.stdout.is_empty());
     }
 
     #[test]
     fn empty_file_exits_with_failure() {
-        let output = engine().arg(fixture("empty_file.csv")).output().unwrap();
+        let output = ledger_binary()
+            .arg(fixture("empty_file.csv"))
+            .output()
+            .unwrap();
         assert_eq!(output.status.code(), Some(1));
         assert!(output.stdout.is_empty());
     }
@@ -211,7 +217,7 @@ fn large_input_streams_successfully() {
     let path = Path::new(env!("CARGO_TARGET_TMPDIR")).join("large_input.csv");
     generator::write_transactions(BufWriter::new(File::create(&path).unwrap()), 1_000_000).unwrap();
 
-    let output = engine().arg(&path).output().unwrap();
+    let output = ledger_binary().arg(&path).output().unwrap();
     assert!(output.status.success());
 
     let stdout = String::from_utf8(output.stdout).unwrap();
