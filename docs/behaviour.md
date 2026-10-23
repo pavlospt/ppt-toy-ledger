@@ -23,7 +23,7 @@ are tests in `tests/cli.rs`; `fixture …` means `tests/fixtures/<name>.csv`.
 | Resolve or chargeback of an undisputed deposit | Ignored as `NotDisputed` | Nothing is held | `TxState::transition` | `engine::tests::{resolves,chargebacks}::*_without_dispute_is_ignored` |
 | Dispute-family row for an unknown ID | Ignored as `UnknownTx` | Spec | `Engine::advance_dispute` | `engine::tests::*::*_of_unknown_tx_is_ignored` |
 | Withdrawal larger than available | Rejected as `InsufficientFunds`; held funds can't be withdrawn | Spec | `Account::withdraw` | `account::tests::withdraw_*`, fixture `insufficient_funds` |
-| First reference to a client | Account created even if that row is then rejected; rows that fail to parse create nothing | Spec: unknown clients get a record on first reference | First line of each `Engine` handler (`entry().or_default()`) | `engine::tests::accounts::rejected_*_still_creates_account`, fixtures `account_creation`, `malformed_rows` |
+| First reference to a client | A deposit or withdrawal opens the account even if it is then rejected. An ignored dispute, resolve or chargeback opens none, and rows that fail to parse open none | Unknown clients get a record when first referenced; a dispute-family row the engine ignores is an error by its sender, so it should leave no trace | `Engine::deposit` and `Engine::withdraw` open the account first; `Engine::advance_dispute` only after the row is valid | `engine::tests::accounts::rejected_withdrawal_still_creates_account`, `engine::tests::accounts::ignored_dispute_resolve_or_chargeback_opens_no_account`, fixtures `account_creation`, `invalid_disputes`, `malformed_rows` |
 | Arithmetic overflow anywhere | Rejected as `Overflow`, nothing changes | Never produce a wrong balance | `Account::commit` | `account::tests::*overflow*`, `engine::tests::deposits_and_withdrawals::deposit_overflow_is_rejected`, fixture `precision` |
 
 ## Rows and amounts
@@ -41,3 +41,4 @@ are tests in `tests/cli.rs`; `fixture …` means `tests/fixtures/<name>.csv`.
 | Header missing a required column, or empty file | Fatal, exit 1 | `TransactionReader::new` | `io::tests::rejects_*`, `cli::fatal_errors::*` |
 | Columns in a different order | Accepted; matched by header name | serde decode by header | `io::tests::accepts_reordered_columns`, fixture `reordered_columns` |
 | I/O error while reading | Fatal, exit 1; the reader stops | `TransactionReader::next` | `io::tests::surfaces_io_failure_as_fatal_and_stops` |
+| Reporting | Malformed rows get one stderr line each, with their row number; transactions the engine rejects are not reported | `run` in `main.rs` | `cli::diagnostics::malformed_rows_are_reported_once_each_with_row_numbers`, `cli::diagnostics::engine_rejections_are_not_reported` |

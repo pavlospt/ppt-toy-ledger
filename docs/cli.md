@@ -10,7 +10,7 @@ ppt-toy-ledger <transactions.csv> > accounts.csv
 ```
 
 Exactly one argument, the input path. Any other argument count is a usage
-error.
+error. A sample input, `transactions.csv`, sits at the repository root.
 
 ## Input
 
@@ -51,18 +51,20 @@ client,available,held,total,locked
 
 ## Diagnostics (stderr)
 
-Each skipped row produces one line, prefixed with its row number. The header
-is row 1, and blank lines aren't counted. Without blank lines, the row number
-equals the physical line number. Rows are numbered rather than lines because
-the csv crate reports a record's line as the point where it started reading,
-which falls before any blank lines it skipped. There are two kinds:
+Each row that can't be parsed produces one line, prefixed with its row number.
+The header is row 1, and blank lines aren't counted. Without blank lines, the
+row number equals the physical line number. Rows are numbered rather than lines
+because the csv crate reports a record's line as the point where it started
+reading, which falls before any blank lines it skipped.
 
 ```text
-row 4: invalid amount: amount has more than 4 decimal places    # row failed to parse
-row 9: withdrawal rejected: insufficient available funds         # engine rejected it
+row 4: invalid amount: amount has more than 4 decimal places
 ```
 
-There is no summary line. Failures writing to stderr are ignored, so they
+Rows that parse but that the engine rejects (insufficient funds, a dispute of
+an unknown or settled transaction, activity on a locked account) are expected
+outcomes and are not reported, so stderr stays small on large inputs. Their
+effect is visible in the output balances. There is no summary line. Failures writing to stderr are ignored, so they
 never stop processing.
 
 ## Exit codes

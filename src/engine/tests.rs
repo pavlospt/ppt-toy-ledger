@@ -168,13 +168,12 @@ mod accounts {
     }
 
     #[test]
-    fn rejected_dispute_still_creates_account() {
+    fn ignored_dispute_resolve_or_chargeback_opens_no_account() {
         let mut engine = Engine::new();
-        assert_eq!(
-            engine.apply(dispute(BOB, 99)),
-            Err(EngineError::UnknownTx(TxId(99)))
-        );
-        assert_account(&engine, BOB, "0", "0", false);
+        for tx in [dispute(BOB, 99), resolve(BOB, 99), chargeback(BOB, 99)] {
+            assert_eq!(engine.apply(tx), Err(EngineError::UnknownTx(TxId(99))));
+        }
+        assert_eq!(engine.account(BOB), None);
     }
 }
 
@@ -354,7 +353,7 @@ mod disputes {
             })
         );
         assert_account(&engine, ALICE, "5", "0", false);
-        assert_account(&engine, BOB, "0", "0", false);
+        assert_eq!(engine.account(BOB), None);
     }
 
     #[test]
@@ -531,7 +530,7 @@ mod chargebacks {
             Err(EngineError::ClientMismatch { .. })
         ));
         assert_account(&engine, ALICE, "0", "5", false);
-        assert_account(&engine, BOB, "0", "0", false);
+        assert_eq!(engine.account(BOB), None);
     }
 
     #[test]

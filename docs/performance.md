@@ -28,7 +28,7 @@ runs:
 
 | Input | Time | Peak memory |
 |---|---|---|
-| 10 M generated mixed rows | 1.9 s | 38 MB |
+| 10 M generated mixed rows | 1.3 s | 38 MB |
 | 10 M deposits, all accepted and stored (worst case for memory) | 1.5 s | 573 MB |
 
 Earlier versions, on the same inputs:
@@ -37,10 +37,12 @@ Earlier versions, on the same inputs:
 |---|---|---|
 | Original (csv trims each row, 24-byte entries) | 3.9 s, 55 MB | 3.9 s, 841 MB |
 | Reused trim buffer | 1.9 s, 55 MB | 1.7 s, 841 MB |
-| 16-byte deposit entries (current) | 1.9 s, 38 MB | 1.5 s, 573 MB |
+| 16-byte deposit entries | 1.9 s, 38 MB | 1.5 s, 573 MB |
+| Engine rejections no longer logged (current) | 1.3 s, 38 MB | 1.5 s, 573 MB |
 
 - **Mixed input:** chargebacks lock most accounts early, so most later
-  deposits are rejected and never stored. That keeps its memory low.
+  deposits are rejected and never stored. That keeps its memory low. It used
+  to write about 8.7 M stderr lines, one per rejection; it now writes none.
 - **Worst case:**
   - The measured peak is about 57 bytes per stored deposit.
   - Each map entry is 16 bytes plus one control byte, in power-of-two tables,

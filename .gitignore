@@ -8,3 +8,6 @@
 
 # Generated large inputs for manual memory checks
 /large*.csv
+
+# Output of the sample run: cargo run -- transactions.csv > accounts.csv
+/accounts.csv

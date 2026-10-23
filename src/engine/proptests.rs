@@ -53,7 +53,7 @@ proptest! {
     }
 
     #[test]
-    fn rejected_transactions_change_nothing_but_may_open_an_empty_account(txs in transactions()) {
+    fn rejected_transactions_change_nothing_but_a_new_empty_account(txs in transactions()) {
         let mut engine = Engine::new();
         for tx in txs {
             let before = engine.clone();
@@ -66,7 +66,11 @@ proptest! {
                     .accounts()
                     .filter(|(client, _)| before.account(*client).is_none())
                     .collect();
-                prop_assert!(opened.len() <= 1);
+                let may_open = matches!(
+                    tx,
+                    Transaction::Deposit { .. } | Transaction::Withdrawal { .. }
+                );
+                prop_assert!(opened.len() <= usize::from(may_open), "{:?} opened {:?}", tx, opened);
                 for (client, account) in opened {
                     prop_assert_eq!(client, tx.client());
                     prop_assert_eq!(account, &Account::default());

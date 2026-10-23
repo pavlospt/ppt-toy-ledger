@@ -13,8 +13,10 @@ file ─▶ io::TransactionReader ─▶ Transaction ─▶ Engine::apply ─▶
 stdout ◀─ io::write_accounts ◀──────────────────────────┘
 ```
 
-`main` drives the loop. It pulls one row at a time, logs each skipped row to
-stderr, and writes accounts at the end.
+`main` drives the loop. It pulls one row at a time, reports each malformed row
+on stderr, applies the rest, and writes accounts at the end. Transactions the
+engine rejects are dropped silently: they are expected outcomes, not bad
+input.
 
 ## Modules
 
@@ -25,7 +27,7 @@ stderr, and writes accounts at the end.
 | `error` | `EngineError`: why a well-formed transaction was refused. Shared by `account` and `engine`, so it sits apart from both. | `transaction` |
 | `account` | `Account`: balances, lock, `commit` (the only balance writer). | `amount`, `error` |
 | `engine` | `Engine` (one handler per transaction kind), `TxState`, `DisputeAction`, the deposit store. | `account`, `error`, `transaction` |
-| `io` | `TransactionReader` (iterator of `Result<Row, ReadError>`, each row carrying its row number), `write_accounts`. | `csv`, `transaction`, `account` |
+| `io` | `TransactionReader` (iterator of `Result<Transaction, ReadError>`; errors carry the row number), `write_accounts`. | `csv`, `transaction`, `account` |
 | `main` | Arguments, `AppError`, exit codes, diagnostics. | everything |
 
 ## Design rules

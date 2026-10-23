@@ -84,7 +84,7 @@ Trade-offs to decide before building it:
   unique per shard.
 - **A cross-client dispute becomes `UnknownTx` instead of `ClientMismatch`.**
   The row lands on the disputing client's shard, which never stored the
-  deposit. Both are ignored, so only the diagnostic text changes.
+  deposit. Both are ignored silently, so nothing visible changes.
 - **Shards share the memory budget.** The store options above still apply,
   per shard.
 

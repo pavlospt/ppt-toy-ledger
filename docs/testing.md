@@ -24,9 +24,9 @@ order, so they behave the same under either runner.
 
 | Layer | Where | Count | What it pins down |
 |---|---|---|---|
-| Unit | `#[cfg(test)] mod tests` in each `src/*.rs`, plus `src/engine/tests.rs` | 107 | Amount parse/format/arithmetic; raw row → `Transaction`; every `Account` operation; all 12 lifecycle cells; each transaction type and each decision in [behaviour.md](behaviour.md) |
+| Unit | `#[cfg(test)] mod tests` in each `src/*.rs`, plus `src/engine/tests.rs` | 105 | Amount parse/format/arithmetic; raw row → `Transaction`; every `Account` operation; all 12 lifecycle cells; each transaction type and each decision in [behaviour.md](behaviour.md) |
 | Property | `src/engine/proptests.rs`, `amount::tests` | 8 | Invariants over random transaction sequences; amount round-trips |
-| End-to-end | `tests/cli.rs` + `tests/fixtures/` | 21 | Real binary: outputs, stderr diagnostics, exit codes |
+| End-to-end | `tests/cli.rs` + `tests/fixtures/` + root `transactions.csv` | 22 | Real binary: outputs, stderr diagnostics (malformed rows only), exit codes |
 | Large input | `tests/cli.rs::large_input_streams_successfully` (ignored) | 1 | 1 M generated rows stream through; every output row satisfies `total == available + held` |
 
 Because the crate is a binary only, unit and property tests must live inside
@@ -41,7 +41,7 @@ references and repeated disputes common.
 | Property | Checked |
 |---|---|
 | `total == available + held`, `held >= 0` | after every step |
-| A rejected transaction changes nothing, except opening at most one empty account for its client | after every step |
+| A rejected transaction changes nothing, except that a deposit or withdrawal may open one empty account for its client | after every step |
 | A locked account never unlocks | after every step |
 | Money is conserved per client | at the end |
 | `held` equals the sum of that client's disputed deposits | at the end |

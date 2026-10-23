@@ -119,9 +119,10 @@ impl Engine {
         Self::default()
     }
 
-    // Any well-formed transaction opens an account for its client, even if it
-    // is then rejected: the first reference creates the record. Each handler
-    // below therefore starts by fetching or creating the account.
+    // A deposit or withdrawal opens an account for a new client even if it is
+    // then rejected: the first reference creates the record. A dispute,
+    // resolve or chargeback the engine ignores is treated as an error by
+    // whoever sent it and leaves no trace, so it opens no account.
     pub fn apply(&mut self, tx: Transaction) -> Result<(), EngineError> {
         match tx {
             Transaction::Deposit { client, tx, amount } => self.deposit(client, tx, amount),
@@ -181,7 +182,6 @@ impl Engine {
         tx: TxId,
         action: DisputeAction,
     ) -> Result<(), EngineError> {
-        let account = self.accounts.entry(client).or_default();
         let deposit = self
             .deposits
             .get_mut(&tx)
@@ -194,6 +194,9 @@ impl Engine {
             });
         }
         let next = deposit.state.transition(action)?;
+        // The deposit that got us here already opened this account; the entry
+        // call only avoids a lookup that could fail.
+        let account = self.accounts.entry(client).or_default();
         match action {
             DisputeAction::Dispute => account.hold(deposit.amount)?,
             DisputeAction::Resolve => account.release(deposit.amount)?,

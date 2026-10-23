@@ -131,6 +131,31 @@ mod scenarios {
     }
 }
 
+// The sample at the repository root makes the documented command,
+// `cargo run -- transactions.csv > accounts.csv`, work on a fresh clone.
+#[test]
+fn root_sample_runs_with_the_documented_command() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let output = ledger_binary()
+        .arg("transactions.csv")
+        .current_dir(root)
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(output.status.success(), "stderr:\n{stderr}");
+    assert!(stderr.is_empty(), "stderr:\n{stderr}");
+    assert_eq!(
+        normalize(&String::from_utf8(output.stdout).unwrap()),
+        normalize(
+            "client,available,held,total,locked\n\
+             1,1.5000,0.0000,1.5000,false\n\
+             2,2.0000,0.0000,2.0000,false\n\
+             3,10.0000,0.0000,10.0000,false\n\
+             4,0.0000,0.0000,0.0000,true\n"
+        )
+    );
+}
+
 mod diagnostics {
     use super::*;
 
@@ -149,10 +174,15 @@ mod diagnostics {
     }
 
     #[test]
-    fn engine_rejections_are_reported_with_row_numbers() {
-        let stderr = assert_fixture("insufficient_funds");
-        assert!(stderr.contains("row 3:"), "{stderr}");
-        assert!(stderr.contains("insufficient"), "{stderr}");
+    fn engine_rejections_are_not_reported() {
+        for fixture in [
+            "insufficient_funds",
+            "invalid_disputes",
+            "locked_account_rejections",
+        ] {
+            let stderr = assert_fixture(fixture);
+            assert!(stderr.is_empty(), "{fixture} wrote to stderr:\n{stderr}");
+        }
     }
 }
 

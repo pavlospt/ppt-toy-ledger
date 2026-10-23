@@ -36,3 +36,12 @@ housekeeping are left out, and so is anything copied from the original brief.
    have comments about why we went that way"
 10. **This file.** Add a prompt history, keep it free of the task's origin,
     and list only prompts that produced work, briefly.
+11. **Compliance pass.** "Do one more pass of this to see if we deviate
+    anywhere", against the original brief (not included). The author chose
+    three fixes: ignored dispute, resolve and chargeback rows open no
+    account; stderr reports malformed rows only; and the README gains a
+    section for reviewers.
+12. **Running out of the box.** "thsi is not running $ cargo run --
+    transactions.csv > accounts.csv". The repository had no
+    `transactions.csv`; a root sample, a test pinning its output, and an
+    ignore rule for `accounts.csv` were added.

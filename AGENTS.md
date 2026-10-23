@@ -13,7 +13,7 @@ account as CSV. The toolchain is pinned to Rust 1.99.1 in `rust-toolchain.toml`.
 | Task | Command |
 |---|---|
 | Build | `cargo build --release` |
-| Run | `cargo run --release -- <input.csv> > accounts.csv` |
+| Run | `cargo run -- transactions.csv > accounts.csv` (add `--release` for large inputs) |
 | Format check | `cargo fmt --check` |
 | Lint | `cargo clippy --all-targets -- -D warnings` |
 | Test | `cargo test` |
@@ -44,6 +44,7 @@ equivalent commands.
 | `src/engine/tests.rs`, `src/engine/proptests.rs` | Engine unit and property tests. |
 | `tests/cli.rs` | End-to-end tests of the built binary. |
 | `tests/fixtures/` | CLI input/expected-output pairs, indexed in its `README.md`. |
+| `transactions.csv` | Sample input for the documented run command; its output is pinned by `root_sample_runs_with_the_documented_command`. |
 | `tests/support/generator.rs` | Deterministic large-input generator, shared with `examples/generate.rs`. |
 | `docs/` | Topic docs, listed below. |
 | `PROMPTS.md` | The author's prompts that shaped the project, in order. |
@@ -65,8 +66,9 @@ equivalent commands.
 1. `total == available + held` for every account. `total` is derived, never
    stored (`Account::total`).
 2. `held` is never negative.
-3. A rejected transaction changes nothing, except that the first valid row for
-   a client opens an empty account.
+3. A rejected transaction changes nothing, except that a deposit or withdrawal
+   for a new client opens an empty account. Ignored dispute, resolve and
+   chargeback rows open none.
 4. A locked account never unlocks.
 5. Money is conserved. A client's total equals accepted deposits, minus
    accepted withdrawals, minus charged-back deposits.

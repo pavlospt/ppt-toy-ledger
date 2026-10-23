@@ -14,7 +14,7 @@ use std::process::ExitCode;
 use thiserror::Error;
 
 use crate::engine::Engine;
-use crate::io::{ReadError, Row, TransactionReader};
+use crate::io::{ReadError, TransactionReader};
 
 #[derive(Debug, Error)]
 enum AppError {
@@ -65,16 +65,16 @@ fn run(mut args: impl Iterator<Item = OsString>) -> Result<(), AppError> {
     let transactions = TransactionReader::new(file)?;
     let mut engine = Engine::new();
 
-    // Diagnostics are best effort: a closed or failing stderr must not stop
-    // the ledger from being processed, so write errors there are ignored.
+    // Only malformed rows are reported. A business rejection (insufficient
+    // funds, an unknown or already-settled dispute, a locked account) is an
+    // expected outcome rather than bad input, and reporting each one would
+    // flood stderr on large inputs. Diagnostics are best effort: a closed or
+    // failing stderr must not stop the ledger, so write errors are ignored.
     let mut diagnostics = BufWriter::new(std::io::stderr().lock());
     for result in transactions {
         match result {
-            Ok(Row { row, transaction }) => {
-                if let Err(error) = engine.apply(transaction) {
-                    let kind = transaction.kind();
-                    let _ = writeln!(diagnostics, "row {row}: {kind} rejected: {error}");
-                }
+            Ok(transaction) => {
+                let _ = engine.apply(transaction);
             }
             Err(error @ ReadError::Row { .. }) => {
                 let _ = writeln!(diagnostics, "{error}");

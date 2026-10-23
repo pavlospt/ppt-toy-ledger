@@ -19,6 +19,6 @@ test fatal errors.
 | `precision` | Minimum unit, `1.` and `.5` forms, 4-decimal arithmetic, the maximum representable balance, a deposit that would overflow, and a 5-decimal amount. |
 | `header_only` | Header with no rows: output is just the header. |
 | `reordered_columns` | Columns are matched by header name, not by position. |
-| `account_creation` | Each transaction type creates an account for a client it is the first to reference, even when the transaction is rejected. |
+| `account_creation` | A deposit or withdrawal opens an account for a new client, even when the withdrawal is rejected; ignored dispute, resolve and chargeback rows open none. |
 | `bad_header` | Missing required columns: fatal, exit code 1. |
 | `empty_file` | Zero-byte input has no header: fatal, exit code 1. |

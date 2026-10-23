@@ -22,8 +22,9 @@ bitmap, would catch it at a small memory cost.
 
 ## Operations
 
-Replace the free-text stderr lines with structured logs, plus counters of
-rejected rows by reason.
+Replace the free-text stderr lines with structured logs, and add counters of
+rejected rows by reason. Engine rejections are currently not reported at all,
+so counters would make them observable without flooding a log.
 
 ## Packaging
 
