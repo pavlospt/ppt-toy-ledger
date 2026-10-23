@@ -129,6 +129,18 @@ mod memory {
     }
 }
 
+mod concurrency {
+    use super::*;
+
+    // Each connection or shard can own an engine on its own thread or task.
+    #[test]
+    fn engine_can_move_to_another_thread() {
+        let engine = engine_with(&[deposit(ALICE, 1, "5")]);
+        let engine = std::thread::spawn(move || engine).join().unwrap();
+        assert_account(&engine, ALICE, "5", "0", false);
+    }
+}
+
 mod accounts {
     use super::*;
 
