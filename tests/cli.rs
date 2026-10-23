@@ -135,12 +135,12 @@ mod diagnostics {
     use super::*;
 
     #[test]
-    fn malformed_rows_are_reported_once_each_with_line_numbers() {
+    fn malformed_rows_are_reported_once_each_with_row_numbers() {
         let stderr = assert_fixture("malformed_rows");
         let lines: Vec<_> = stderr.lines().collect();
         assert_eq!(lines.len(), 11, "stderr:\n{stderr}");
-        for line_number in 3..=13 {
-            let prefix = format!("line {line_number}:");
+        for row in 3..=13 {
+            let prefix = format!("row {row}:");
             assert!(
                 lines.iter().any(|l| l.contains(&prefix)),
                 "missing {prefix} in stderr:\n{stderr}"
@@ -149,9 +149,9 @@ mod diagnostics {
     }
 
     #[test]
-    fn engine_rejections_are_reported_with_line_numbers() {
+    fn engine_rejections_are_reported_with_row_numbers() {
         let stderr = assert_fixture("insufficient_funds");
-        assert!(stderr.contains("line 3:"), "{stderr}");
+        assert!(stderr.contains("row 3:"), "{stderr}");
         assert!(stderr.contains("insufficient"), "{stderr}");
     }
 }

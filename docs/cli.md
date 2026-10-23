@@ -51,12 +51,15 @@ client,available,held,total,locked
 
 ## Diagnostics (stderr)
 
-Each skipped row produces one line prefixed with its 1-based input line
-number. The header is line 1. There are two kinds:
+Each skipped row produces one line, prefixed with its row number. The header
+is row 1, and blank lines aren't counted. Without blank lines, the row number
+equals the physical line number. Rows are numbered rather than lines because
+the csv crate reports a record's line as the point where it started reading,
+which falls before any blank lines it skipped. There are two kinds:
 
 ```text
-line 4: invalid amount: amount has more than 4 decimal places    # row failed to parse
-line 9: withdrawal rejected: insufficient available funds         # engine rejected it
+row 4: invalid amount: amount has more than 4 decimal places    # row failed to parse
+row 9: withdrawal rejected: insufficient available funds         # engine rejected it
 ```
 
 There is no summary line. Failures writing to stderr are ignored, so they

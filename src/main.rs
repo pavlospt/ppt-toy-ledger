@@ -14,7 +14,7 @@ use std::process::ExitCode;
 use thiserror::Error;
 
 use crate::engine::Engine;
-use crate::io::{ReadError, TransactionReader};
+use crate::io::{ReadError, Row, TransactionReader};
 
 #[derive(Debug, Error)]
 enum AppError {
@@ -62,22 +62,18 @@ fn run(mut args: impl Iterator<Item = OsString>) -> Result<(), AppError> {
         path: path.clone(),
         source,
     })?;
-    let mut transactions = TransactionReader::new(file)?;
+    let transactions = TransactionReader::new(file)?;
     let mut engine = Engine::new();
 
     // Diagnostics are best effort: a closed or failing stderr must not stop
     // the ledger from being processed, so write errors there are ignored.
     let mut diagnostics = BufWriter::new(std::io::stderr().lock());
-    while let Some(result) = transactions.next() {
+    for result in transactions {
         match result {
-            Ok(tx) => {
-                if let Err(error) = engine.apply(tx) {
-                    let _ = writeln!(
-                        diagnostics,
-                        "line {}: {} rejected: {error}",
-                        transactions.line(),
-                        tx.kind()
-                    );
+            Ok(Row { row, transaction }) => {
+                if let Err(error) = engine.apply(transaction) {
+                    let kind = transaction.kind();
+                    let _ = writeln!(diagnostics, "row {row}: {kind} rejected: {error}");
                 }
             }
             Err(error @ ReadError::Row { .. }) => {

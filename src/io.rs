@@ -22,8 +22,8 @@ pub enum HeaderError {
 pub enum ReadError {
     #[error("failed to read input: {0}")]
     Io(#[source] csv::Error),
-    #[error("line {line}: {reason}")]
-    Row { line: u64, reason: RowError },
+    #[error("row {row}: {reason}")]
+    Row { row: u64, reason: RowError },
 }
 
 #[derive(Debug, Error)]
@@ -34,6 +34,17 @@ pub enum RowError {
     TooManyFields(usize),
     #[error(transparent)]
     Invalid(#[from] ParseError),
+}
+
+// A parsed row and its number, so problems found later (for example engine
+// rejections) can still be reported against it. Rows are counted rather than
+// physical lines: the header is row 1 and blank lines are skipped, because the
+// csv crate reports a record's line as where reading began, before any blank
+// lines it skipped.
+#[derive(Debug)]
+pub struct Row {
+    pub row: u64,
+    pub transaction: Transaction,
 }
 
 pub struct TransactionReader<R: Read> {
@@ -70,10 +81,8 @@ impl<R: Read> TransactionReader<R> {
         })
     }
 
-    // The input line on which the most recently read row starts, so callers
-    // can report problems found after parsing.
-    pub fn line(&self) -> u64 {
-        self.record.position().map_or(0, csv::Position::line)
+    fn current_row(&self) -> u64 {
+        self.record.position().map_or(0, row_number)
     }
 
     fn parse_record(&mut self) -> Result<Transaction, RowError> {
@@ -96,7 +105,7 @@ impl<R: Read> TransactionReader<R> {
 }
 
 impl<R: Read> Iterator for TransactionReader<R> {
-    type Item = Result<Transaction, ReadError>;
+    type Item = Result<Row, ReadError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.finished {
@@ -110,25 +119,30 @@ impl<R: Read> Iterator for TransactionReader<R> {
                 None
             }
             Ok(true) => {
-                let parsed = self.parse_record();
-                Some(parsed.map_err(|reason| ReadError::Row {
-                    line: self.line(),
-                    reason,
-                }))
+                let row = self.current_row();
+                Some(match self.parse_record() {
+                    Ok(transaction) => Ok(Row { row, transaction }),
+                    Err(reason) => Err(ReadError::Row { row, reason }),
+                })
             }
             Err(error) if matches!(error.kind(), csv::ErrorKind::Io(_)) => {
                 self.finished = true;
                 Some(Err(ReadError::Io(error)))
             }
             Err(error) => {
-                let line = error.position().map_or(0, csv::Position::line);
+                let row = error.position().map_or(0, row_number);
                 Some(Err(ReadError::Row {
-                    line,
+                    row,
                     reason: RowError::Malformed(error),
                 }))
             }
         }
     }
+}
+
+// csv numbers records from 0, with the header as record 0.
+fn row_number(position: &csv::Position) -> u64 {
+    position.record() + 1
 }
 
 // Rows are sorted by client so output is deterministic and diffable, even
@@ -165,18 +179,18 @@ mod tests {
         s.parse().unwrap()
     }
 
-    fn read_all(input: &str) -> Vec<Result<Transaction, ReadError>> {
+    fn read_all(input: &str) -> Vec<Result<Row, ReadError>> {
         TransactionReader::new(input.as_bytes()).unwrap().collect()
     }
 
     #[track_caller]
-    fn assert_row_error(result: &Result<Transaction, ReadError>, expected_line: u64) -> &RowError {
+    fn assert_row_error(result: &Result<Row, ReadError>, expected_row: u64) -> &RowError {
         match result {
-            Err(ReadError::Row { line, reason }) => {
-                assert_eq!(*line, expected_line, "line number");
+            Err(ReadError::Row { row, reason }) => {
+                assert_eq!(*row, expected_row, "row number");
                 reason
             }
-            other => panic!("expected row error on line {expected_line}, got {other:?}"),
+            other => panic!("expected an error for row {expected_row}, got {other:?}"),
         }
     }
 
@@ -185,7 +199,7 @@ mod tests {
         let rows = read_all("type, client, tx, amount\n  deposit ,  1 ,\t2 , 1.5 \n");
         assert_eq!(rows.len(), 1);
         assert_eq!(
-            rows[0].as_ref().unwrap(),
+            &rows[0].as_ref().unwrap().transaction,
             &Transaction::Deposit {
                 client: ClientId(1),
                 tx: TxId(2),
@@ -198,14 +212,14 @@ mod tests {
     fn accepts_trailing_comma_or_missing_amount_column() {
         let rows = read_all("type,client,tx,amount\ndispute,1,2,\nresolve,1,2\n");
         assert_eq!(
-            rows[0].as_ref().unwrap(),
+            &rows[0].as_ref().unwrap().transaction,
             &Transaction::Dispute {
                 client: ClientId(1),
                 tx: TxId(2)
             }
         );
         assert_eq!(
-            rows[1].as_ref().unwrap(),
+            &rows[1].as_ref().unwrap().transaction,
             &Transaction::Resolve {
                 client: ClientId(1),
                 tx: TxId(2)
@@ -217,13 +231,27 @@ mod tests {
     fn accepts_reordered_columns() {
         let rows = read_all("amount,tx,client,type\n2.0,5,3,withdrawal\n");
         assert_eq!(
-            rows[0].as_ref().unwrap(),
+            &rows[0].as_ref().unwrap().transaction,
             &Transaction::Withdrawal {
                 client: ClientId(3),
                 tx: TxId(5),
                 amount: amount("2"),
             }
         );
+    }
+
+    #[test]
+    fn numbers_rows_from_the_header_skipping_blank_lines() {
+        let rows = read_all("type,client,tx,amount\ndeposit,1,1,1.0\n\n\r\ndeposit,1,2,1.0\n");
+        let numbers: Vec<u64> = rows.iter().map(|row| row.as_ref().unwrap().row).collect();
+        assert_eq!(numbers, vec![2, 3]);
+    }
+
+    #[test]
+    fn numbers_bad_rows_the_same_way() {
+        let rows = read_all("type,client,tx,amount\n\ndeposit,1,1,x\n\ndeposit,70000,2,1.0\n");
+        assert_row_error(&rows[0], 2);
+        assert_row_error(&rows[1], 3);
     }
 
     #[test]
@@ -252,7 +280,7 @@ mod tests {
     }
 
     #[test]
-    fn reports_too_many_fields_with_line_number() {
+    fn reports_too_many_fields_with_row_number() {
         let rows = read_all("type,client,tx,amount\ndeposit,1,1,1.0,extra\n");
         assert!(matches!(
             assert_row_error(&rows[0], 2),
@@ -302,7 +330,7 @@ mod tests {
     }
 
     #[test]
-    fn continues_after_bad_rows_with_correct_line_numbers() {
+    fn continues_after_bad_rows_with_correct_row_numbers() {
         let rows = read_all(
             "type,client,tx,amount\n\
              deposit,1,1,1.0\n\
