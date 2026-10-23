@@ -4,23 +4,32 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
 
+# Actions are pinned to full commit SHAs, with the release they correspond to
+# in a comment, so a moved tag can't change what runs.
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10-16
         with:
           toolchain: "1.99.1"
           components: rustfmt, clippy
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@a4d3f3f761dcd95cce1b72cb61cb6d1963438177 # v2.87.30
         with:
           tool: nextest
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
-      - run: cargo nextest run --profile ci
-      - run: cargo nextest run --profile ci --release --run-ignored only -E 'test(large_input)'
+      # Every test, including the ignored million-row streaming test, under
+      # both supported runners; both must pass.
+      - name: Test (cargo test)
+        run: cargo test --all -- --include-ignored
+      - name: Test (cargo nextest)
+        run: cargo nextest run --profile ci --all --run-ignored all
