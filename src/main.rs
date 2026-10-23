@@ -1,6 +1,7 @@
 mod account;
 mod amount;
 mod engine;
+mod error;
 mod io;
 mod transaction;
 

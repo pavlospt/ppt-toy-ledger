@@ -1,5 +1,5 @@
 use crate::amount::Amount;
-use crate::engine::EngineError;
+use crate::error::EngineError;
 
 // `total` is derived rather than stored, so `total == available + held` holds
 // by construction instead of by discipline. Every mutation below computes all

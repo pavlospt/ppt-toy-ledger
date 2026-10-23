@@ -38,6 +38,7 @@ pub enum Transaction {
 }
 
 impl Transaction {
+    #[cfg(test)]
     pub fn client(&self) -> ClientId {
         match *self {
             Transaction::Deposit { client, .. }

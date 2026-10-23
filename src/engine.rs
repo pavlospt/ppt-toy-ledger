@@ -1,41 +1,14 @@
 use std::collections::HashMap;
 
-use thiserror::Error;
-
 use crate::account::Account;
 use crate::amount::Amount;
+use crate::error::EngineError;
 use crate::transaction::{ClientId, Transaction, TxId};
 
 #[cfg(test)]
 mod proptests;
 #[cfg(test)]
 mod tests;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
-pub enum EngineError {
-    #[error("insufficient available funds")]
-    InsufficientFunds,
-    #[error("account is locked")]
-    AccountLocked,
-    #[error("transaction {} already exists", .0.0)]
-    DuplicateTx(TxId),
-    #[error("transaction {} is not a known deposit", .0.0)]
-    UnknownTx(TxId),
-    #[error("transaction {} belongs to client {}, not client {}", .tx.0, .owner.0, .client.0)]
-    ClientMismatch {
-        tx: TxId,
-        owner: ClientId,
-        client: ClientId,
-    },
-    #[error("transaction is already under dispute")]
-    AlreadyDisputed,
-    #[error("transaction is not under dispute")]
-    NotDisputed,
-    #[error("transaction dispute is already settled")]
-    AlreadySettled,
-    #[error("arithmetic overflow")]
-    Overflow,
-}
 
 /// Lifecycle of a stored deposit with respect to disputes.
 ///
@@ -127,59 +100,88 @@ impl Engine {
         Self::default()
     }
 
+    // Any well-formed transaction opens an account for its client, even if it
+    // is then rejected: the first reference creates the record. Each handler
+    // below therefore starts by fetching or creating the account.
     pub fn apply(&mut self, tx: Transaction) -> Result<(), EngineError> {
-        // Any well-formed row opens an account for its client, even if the
-        // transaction is then rejected: the first reference creates the record.
-        let account = self.accounts.entry(tx.client()).or_default();
-
         match tx {
-            Transaction::Deposit { client, tx, amount } => {
-                if self.deposits.contains_key(&tx) {
-                    return Err(EngineError::DuplicateTx(tx));
-                }
-                account.deposit(amount)?;
-                self.deposits.insert(
-                    tx,
-                    Deposit {
-                        client,
-                        amount,
-                        state: TxState::Processed,
-                    },
-                );
-                Ok(())
+            Transaction::Deposit { client, tx, amount } => self.deposit(client, tx, amount),
+            Transaction::Withdrawal { client, tx, amount } => self.withdraw(client, tx, amount),
+            Transaction::Dispute { client, tx } => {
+                self.advance_dispute(client, tx, DisputeAction::Dispute)
             }
-            // Withdrawal IDs are not stored, so only a collision with a known
-            // deposit is detected; IDs are unique by contract and keeping every
-            // withdrawal would grow memory for transactions that can never be
-            // disputed.
-            Transaction::Withdrawal { tx, amount, .. } => {
-                if self.deposits.contains_key(&tx) {
-                    return Err(EngineError::DuplicateTx(tx));
-                }
-                account.withdraw(amount)
+            Transaction::Resolve { client, tx } => {
+                self.advance_dispute(client, tx, DisputeAction::Resolve)
             }
-            Transaction::Dispute { client, tx } => apply_dispute_action(
-                account,
-                &mut self.deposits,
-                DisputeAction::Dispute,
-                client,
-                tx,
-            ),
-            Transaction::Resolve { client, tx } => apply_dispute_action(
-                account,
-                &mut self.deposits,
-                DisputeAction::Resolve,
-                client,
-                tx,
-            ),
-            Transaction::Chargeback { client, tx } => apply_dispute_action(
-                account,
-                &mut self.deposits,
-                DisputeAction::Chargeback,
-                client,
-                tx,
-            ),
+            Transaction::Chargeback { client, tx } => {
+                self.advance_dispute(client, tx, DisputeAction::Chargeback)
+            }
         }
+    }
+
+    fn deposit(&mut self, client: ClientId, tx: TxId, amount: Amount) -> Result<(), EngineError> {
+        let account = self.accounts.entry(client).or_default();
+        if self.deposits.contains_key(&tx) {
+            return Err(EngineError::DuplicateTx(tx));
+        }
+        account.deposit(amount)?;
+        let deposit = Deposit {
+            client,
+            amount,
+            state: TxState::Processed,
+        };
+        self.deposits.insert(tx, deposit);
+        Ok(())
+    }
+
+    // Withdrawal IDs are not stored, so only a collision with a known deposit
+    // is detected; IDs are unique by contract and keeping every withdrawal
+    // would grow memory for transactions that can never be disputed.
+    fn withdraw(&mut self, client: ClientId, tx: TxId, amount: Amount) -> Result<(), EngineError> {
+        let account = self.accounts.entry(client).or_default();
+        if self.deposits.contains_key(&tx) {
+            return Err(EngineError::DuplicateTx(tx));
+        }
+        account.withdraw(amount)
+    }
+
+    /// Drives one [`DisputeAction`] against a stored deposit.
+    ///
+    /// The steps run in an order that makes the action all-or-nothing:
+    /// 1. find the deposit (`UnknownTx` otherwise; withdrawals are never stored),
+    /// 2. check the row's client owns it (`ClientMismatch` otherwise),
+    /// 3. compute the next state without changing anything,
+    /// 4. move the balances, which may still fail on overflow,
+    /// 5. store the next state only once the balances have moved.
+    ///
+    /// A rejection at any step leaves both the deposit and the account as they
+    /// were.
+    fn advance_dispute(
+        &mut self,
+        client: ClientId,
+        tx: TxId,
+        action: DisputeAction,
+    ) -> Result<(), EngineError> {
+        let account = self.accounts.entry(client).or_default();
+        let deposit = self
+            .deposits
+            .get_mut(&tx)
+            .ok_or(EngineError::UnknownTx(tx))?;
+        if deposit.client != client {
+            return Err(EngineError::ClientMismatch {
+                tx,
+                owner: deposit.client,
+                client,
+            });
+        }
+        let next = deposit.state.transition(action)?;
+        match action {
+            DisputeAction::Dispute => account.hold(deposit.amount)?,
+            DisputeAction::Resolve => account.release(deposit.amount)?,
+            DisputeAction::Chargeback => account.charge_back(deposit.amount)?,
+        }
+        deposit.state = next;
+        Ok(())
     }
 
     #[cfg(test)]
@@ -190,40 +192,4 @@ impl Engine {
     pub fn accounts(&self) -> impl Iterator<Item = (ClientId, &Account)> {
         self.accounts.iter().map(|(id, account)| (*id, account))
     }
-}
-
-/// Drives one [`DisputeAction`] against a stored deposit.
-///
-/// The steps run in an order that makes the action all-or-nothing:
-/// 1. find the deposit (`UnknownTx` otherwise; withdrawals are never stored),
-/// 2. check the row's client owns it (`ClientMismatch` otherwise),
-/// 3. compute the next state without changing anything,
-/// 4. move the balances, which may still fail on overflow,
-/// 5. store the next state only once the balances have moved.
-///
-/// A rejection at any step leaves both the deposit and the account as they were.
-fn apply_dispute_action(
-    account: &mut Account,
-    deposits: &mut HashMap<TxId, Deposit>,
-    action: DisputeAction,
-    client: ClientId,
-    tx: TxId,
-) -> Result<(), EngineError> {
-    let deposit = deposits.get_mut(&tx).ok_or(EngineError::UnknownTx(tx))?;
-    // A client may only act on its own deposits.
-    if deposit.client != client {
-        return Err(EngineError::ClientMismatch {
-            tx,
-            owner: deposit.client,
-            client,
-        });
-    }
-    let next = deposit.state.transition(action)?;
-    match action {
-        DisputeAction::Dispute => account.hold(deposit.amount)?,
-        DisputeAction::Resolve => account.release(deposit.amount)?,
-        DisputeAction::Chargeback => account.charge_back(deposit.amount)?,
-    }
-    deposit.state = next;
-    Ok(())
 }
