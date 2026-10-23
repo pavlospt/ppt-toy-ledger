@@ -23,6 +23,9 @@ pub enum AmountError {
     Overflow,
 }
 
+const DECIMALS: usize = 4;
+const SCALE: u64 = 10_000;
+
 impl Amount {
     pub const ZERO: Amount = Amount(0);
 
@@ -34,15 +37,15 @@ impl Amount {
     // Only checked arithmetic is exposed, so an unchecked operation on money
     // cannot be written by accident.
     pub fn checked_add(self, rhs: Amount) -> Option<Amount> {
-        todo!()
+        self.0.checked_add(rhs.0).map(Amount)
     }
 
     pub fn checked_sub(self, rhs: Amount) -> Option<Amount> {
-        todo!()
+        self.0.checked_sub(rhs.0).map(Amount)
     }
 
     pub fn is_positive(self) -> bool {
-        todo!()
+        self.0 > 0
     }
 }
 
@@ -50,13 +53,45 @@ impl FromStr for Amount {
     type Err = AmountError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        todo!()
+        let s = s.trim();
+        if s.is_empty() {
+            return Err(AmountError::Empty);
+        }
+        let (negative, unsigned) = match s.strip_prefix('-') {
+            Some(rest) => (true, rest),
+            None => (false, s),
+        };
+        let (whole, fraction) = unsigned.split_once('.').unwrap_or((unsigned, ""));
+        let is_digits = |part: &str| part.bytes().all(|b| b.is_ascii_digit());
+        if (whole.is_empty() && fraction.is_empty()) || !is_digits(whole) || !is_digits(fraction) {
+            return Err(AmountError::InvalidFormat);
+        }
+        if fraction.len() > DECIMALS {
+            return Err(AmountError::TooManyDecimals);
+        }
+
+        // Negative values accumulate downwards so that i64::MIN, whose
+        // magnitude has no positive i64 counterpart, still parses.
+        let padding = std::iter::repeat_n(b'0', DECIMALS - fraction.len());
+        let mut digits = whole.bytes().chain(fraction.bytes()).chain(padding);
+        let units = digits.try_fold(0i64, |acc, digit| {
+            let digit = i64::from(digit - b'0');
+            let shifted = acc.checked_mul(10)?;
+            if negative {
+                shifted.checked_sub(digit)
+            } else {
+                shifted.checked_add(digit)
+            }
+        });
+        units.map(Amount).ok_or(AmountError::Overflow)
     }
 }
 
 impl fmt::Display for Amount {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
+        let sign = if self.0 < 0 { "-" } else { "" };
+        let magnitude = self.0.unsigned_abs();
+        write!(f, "{sign}{}.{:04}", magnitude / SCALE, magnitude % SCALE)
     }
 }
 
