@@ -71,21 +71,30 @@ impl FromStr for Amount {
             return Err(AmountError::TooManyDecimals);
         }
 
-        // Negative values accumulate downwards so that i64::MIN, whose
-        // magnitude has no positive i64 counterpart, still parses.
-        let padding = std::iter::repeat_n(b'0', DECIMALS - fraction.len());
-        let mut digits = whole.bytes().chain(fraction.bytes()).chain(padding);
-        let units = digits.try_fold(0i64, |acc, digit| {
-            let digit = i64::from(digit - b'0');
-            let shifted = acc.checked_mul(10)?;
-            if negative {
-                shifted.checked_sub(digit)
-            } else {
-                shifted.checked_add(digit)
-            }
-        });
-        units.map(Amount).ok_or(AmountError::Overflow)
+        // The digits, followed by zeros up to four decimal places, read as one
+        // integer count of 1/10_000 units.
+        let mut units = 0;
+        for digit in whole.bytes().chain(fraction.bytes()) {
+            units = push_digit(units, digit - b'0', negative)?;
+        }
+        for _ in fraction.len()..DECIMALS {
+            units = push_digit(units, 0, negative)?;
+        }
+        Ok(Amount(units))
     }
+}
+
+// Appends one decimal digit. Negative values accumulate downwards so that
+// i64::MIN, whose magnitude has no positive i64 counterpart, still parses.
+fn push_digit(units: i64, digit: u8, negative: bool) -> Result<i64, AmountError> {
+    let shifted = units.checked_mul(10).ok_or(AmountError::Overflow)?;
+    let digit = i64::from(digit);
+    let next = if negative {
+        shifted.checked_sub(digit)
+    } else {
+        shifted.checked_add(digit)
+    };
+    next.ok_or(AmountError::Overflow)
 }
 
 impl fmt::Display for Amount {
