@@ -50,7 +50,10 @@ impl Account {
     // disputed funds were already withdrawn: the client still owes them, and
     // refusing would let a client dodge a dispute by withdrawing first.
     pub fn hold(&mut self, amount: Amount) -> Result<(), EngineError> {
-        todo!()
+        self.commit(
+            self.available.checked_sub(amount),
+            self.held.checked_add(amount),
+        )
     }
 
     pub fn release(&mut self, amount: Amount) -> Result<(), EngineError> {

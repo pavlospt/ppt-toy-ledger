@@ -56,7 +56,17 @@ pub enum DisputeAction {
 
 impl TxState {
     pub fn transition(self, action: DisputeAction) -> Result<TxState, EngineError> {
-        todo!()
+        use DisputeAction::{Chargeback, Dispute, Resolve};
+        use TxState::{ChargedBack, Disputed, Processed, Resolved};
+
+        match (self, action) {
+            (Processed, Dispute) => Ok(Disputed),
+            (Processed, Resolve | Chargeback) => Err(EngineError::NotDisputed),
+            (Disputed, Dispute) => Err(EngineError::AlreadyDisputed),
+            (Disputed, Resolve) => Ok(Resolved),
+            (Disputed, Chargeback) => Ok(ChargedBack),
+            (Resolved | ChargedBack, _) => Err(EngineError::AlreadySettled),
+        }
     }
 }
 
@@ -116,9 +126,27 @@ impl Engine {
                 }
                 account.withdraw(amount)
             }
-            Transaction::Dispute { .. }
-            | Transaction::Resolve { .. }
-            | Transaction::Chargeback { .. } => todo!(),
+            Transaction::Dispute { client, tx } => apply_dispute_action(
+                account,
+                &mut self.deposits,
+                DisputeAction::Dispute,
+                client,
+                tx,
+            ),
+            Transaction::Resolve { client, tx } => apply_dispute_action(
+                account,
+                &mut self.deposits,
+                DisputeAction::Resolve,
+                client,
+                tx,
+            ),
+            Transaction::Chargeback { client, tx } => apply_dispute_action(
+                account,
+                &mut self.deposits,
+                DisputeAction::Chargeback,
+                client,
+                tx,
+            ),
         }
     }
 
@@ -129,4 +157,33 @@ impl Engine {
     pub fn accounts(&self) -> impl Iterator<Item = (ClientId, &Account)> {
         self.accounts.iter().map(|(id, account)| (*id, account))
     }
+}
+
+// The next state is computed before the balances move and stored only after
+// they have, so a rejected action leaves both the deposit and the account as
+// they were.
+fn apply_dispute_action(
+    account: &mut Account,
+    deposits: &mut HashMap<TxId, Deposit>,
+    action: DisputeAction,
+    client: ClientId,
+    tx: TxId,
+) -> Result<(), EngineError> {
+    let deposit = deposits.get_mut(&tx).ok_or(EngineError::UnknownTx(tx))?;
+    // A client may only act on its own deposits.
+    if deposit.client != client {
+        return Err(EngineError::ClientMismatch {
+            tx,
+            owner: deposit.client,
+            client,
+        });
+    }
+    let next = deposit.state.transition(action)?;
+    match action {
+        DisputeAction::Dispute => account.hold(deposit.amount)?,
+        DisputeAction::Resolve => todo!(),
+        DisputeAction::Chargeback => todo!(),
+    }
+    deposit.state = next;
+    Ok(())
 }
