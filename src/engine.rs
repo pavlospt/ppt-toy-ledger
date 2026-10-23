@@ -182,7 +182,7 @@ fn apply_dispute_action(
     match action {
         DisputeAction::Dispute => account.hold(deposit.amount)?,
         DisputeAction::Resolve => account.release(deposit.amount)?,
-        DisputeAction::Chargeback => todo!(),
+        DisputeAction::Chargeback => account.charge_back(deposit.amount)?,
     }
     deposit.state = next;
     Ok(())

@@ -63,8 +63,12 @@ impl Account {
         )
     }
 
+    // Locks immediately and permanently: a chargeback means the client's
+    // funds were reversed, so nothing re-enables the account.
     pub fn charge_back(&mut self, amount: Amount) -> Result<(), EngineError> {
-        todo!()
+        self.commit(Some(self.available), self.held.checked_sub(amount))?;
+        self.locked = true;
+        Ok(())
     }
 
     // A locked account is frozen to the client only. Dispute settlement is
