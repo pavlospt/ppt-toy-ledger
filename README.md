@@ -73,3 +73,4 @@ reports every failure instead of stopping at the first.
 | [docs/performance.md](docs/performance.md) | Measurements, profile findings, how to reproduce them. |
 | [docs/scale.md](docs/scale.md) | Memory at the full `u32` ID scale, and serving many concurrent streams. |
 | [docs/future-work.md](docs/future-work.md) | Known limitations and next steps. |
+| [PROMPTS.md](PROMPTS.md) | The prompts that shaped the project, in order. |

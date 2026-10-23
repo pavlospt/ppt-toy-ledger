@@ -46,6 +46,7 @@ equivalent commands.
 | `tests/fixtures/` | CLI input/expected-output pairs, indexed in its `README.md`. |
 | `tests/support/generator.rs` | Deterministic large-input generator, shared with `examples/generate.rs`. |
 | `docs/` | Topic docs, listed below. |
+| `PROMPTS.md` | The author's prompts that shaped the project, in order. |
 
 ## Docs to read by task
 
@@ -99,3 +100,8 @@ The property tests in `src/engine/proptests.rs` check invariants 1–5.
   `test`, `docs`, `chore`, `refactor`).
 - **Neutral text:** keep code, docs and commit messages free of third-party
   company or product names. Never commit PDFs; `.gitignore` excludes them.
+- **Prompt history:** when an author prompt leads to a change in the
+  repository, add one short numbered entry to `PROMPTS.md` in the same commit:
+  quote it if it is a single line, otherwise summarise it. Skip approvals,
+  push requests and other housekeeping, and leave out anything copied from the
+  original brief.
