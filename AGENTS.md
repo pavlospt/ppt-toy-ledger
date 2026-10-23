@@ -35,6 +35,7 @@ all pass. If cargo-nextest isn't installed, run
 | `src/transaction.rs` | `ClientId`, `TxId`, `Transaction`, raw row → typed conversion. |
 | `src/amount.rs` | `Amount` fixed-point money type. |
 | `src/account.rs` | `Account` balances, lock, and the only code that mutates them. |
+| `src/error.rs` | `EngineError`, shared by `account` and `engine`. |
 | `src/engine.rs` | `Engine`, deposit store, `TxState` lifecycle. |
 | `src/engine/tests.rs`, `src/engine/proptests.rs` | Engine unit and property tests. |
 | `tests/cli.rs` | End-to-end tests of the built binary. |
@@ -51,6 +52,7 @@ all pass. If cargo-nextest isn't installed, run
 | adding a module or moving responsibilities | `docs/architecture.md` |
 | adding or changing tests | `docs/testing.md` |
 | touching the hot path (`io.rs`, `amount.rs`, `engine.rs`) | `docs/performance.md` |
+| reasoning about large inputs or concurrency | `docs/scale.md` |
 | planning larger changes | `docs/future-work.md` |
 
 ## Invariants (never break these)

@@ -4,27 +4,15 @@ Known limitations and possible next steps. None of these are implemented.
 
 ## Many concurrent streams
 
-Because a client can only act on its own deposits (`ClientMismatch`
-otherwise), all state can be split by client:
-
-- Each partition (say, `client % N`) owns its accounts and their deposits, and
-  runs on its own task.
-- Rows from any number of input streams are routed by client, so no locks are
-  shared.
-- `Engine` already takes one `Transaction` at a time and has no I/O, so it can
-  be the per-partition state machine unchanged.
+Run one engine per stream, or split one shared ledger by client across shard
+workers. [scale.md](scale.md) describes both models and their trade-offs.
 
 ## Bounding the deposit store
 
-Memory grows with the number of accepted deposits, at about 42–84 bytes each
+Memory grows with the number of accepted deposits, at about 28–57 bytes each
 (see [performance.md](performance.md)). Covering every `u32` transaction ID
-won't fit in memory. Options:
-
-- expire deposits once a dispute window has passed
-- move cold deposits to an on-disk key-value store behind a small in-memory
-  cache
-- use a more compact entry layout, or pre-size the map when the input size is
-  known, to cut the per-entry cost and the peak during growth
+won't fit in memory. [scale.md](scale.md) has the projections and compares
+the options: a dispute window, a disk-backed store, and pre-sizing the map.
 
 ## Detecting duplicate withdrawal IDs
 

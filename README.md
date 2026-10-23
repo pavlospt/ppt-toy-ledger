@@ -59,4 +59,5 @@ still works if nextest isn't installed.
 | [docs/behaviour.md](docs/behaviour.md) | Every edge-case decision, where it's enforced and which tests cover it. |
 | [docs/testing.md](docs/testing.md) | Test layers, property invariants, fixtures. |
 | [docs/performance.md](docs/performance.md) | Measurements, profile findings, how to reproduce them. |
+| [docs/scale.md](docs/scale.md) | Memory at the full `u32` ID scale, and serving many concurrent streams. |
 | [docs/future-work.md](docs/future-work.md) | Known limitations and next steps. |

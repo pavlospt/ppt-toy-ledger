@@ -23,7 +23,7 @@ Without nextest, `cargo test` runs the same tests serially within each binary.
 
 | Layer | Where | Count | What it pins down |
 |---|---|---|---|
-| Unit | `#[cfg(test)] mod tests` in each `src/*.rs`, plus `src/engine/tests.rs` | 103 | Amount parse/format/arithmetic; raw row → `Transaction`; every `Account` operation; all 12 lifecycle cells; each transaction type and each decision in [behaviour.md](behaviour.md) |
+| Unit | `#[cfg(test)] mod tests` in each `src/*.rs`, plus `src/engine/tests.rs` | 107 | Amount parse/format/arithmetic; raw row → `Transaction`; every `Account` operation; all 12 lifecycle cells; each transaction type and each decision in [behaviour.md](behaviour.md) |
 | Property | `src/engine/proptests.rs`, `amount::tests` | 8 | Invariants over random transaction sequences; amount round-trips |
 | End-to-end | `tests/cli.rs` + `tests/fixtures/` | 21 | Real binary: outputs, stderr diagnostics, exit codes |
 | Large input | `tests/cli.rs::large_input_streams_successfully` (ignored) | 1 | 1 M generated rows stream through; every output row satisfies `total == available + held` |

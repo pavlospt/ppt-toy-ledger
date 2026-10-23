@@ -3,7 +3,7 @@
 Every accepted deposit is stored with a `TxState`, and the dispute, resolve
 and chargeback rows move it through that state. The code is in
 `src/engine.rs`: `TxState`, `DisputeAction`, `TxState::transition` and
-`apply_dispute_action`. Keep the doc comments there consistent with this file.
+`Engine::advance_dispute`. Keep the doc comments there consistent with this file.
 
 ## States
 
@@ -48,7 +48,7 @@ covered by `engine::tests::state_machine`.
 - None of the three methods checks the lock. Disputes on a locked account
   still settle; only `deposit` and `withdraw` are refused.
 
-## Order of checks in `apply_dispute_action`
+## Order of checks in `Engine::advance_dispute`
 
 The order makes every action all-or-nothing:
 

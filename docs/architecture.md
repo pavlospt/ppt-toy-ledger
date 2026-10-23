@@ -22,9 +22,10 @@ stderr, and writes accounts at the end.
 |---|---|---|
 | `amount` | `Amount`, `AmountError`: parse, format, checked add/sub. | — |
 | `transaction` | `ClientId`, `TxId`, `Transaction`, `RawRecord`, `ParseError`. `TryFrom<RawRecord>` is the parsing boundary. | `amount`, serde |
-| `account` | `Account`: balances, lock, `commit` (the only balance writer). | `amount`, `engine::EngineError` |
-| `engine` | `Engine`, `EngineError`, `TxState`, `DisputeAction`, the deposit store. | `account`, `transaction` |
-| `io` | `TransactionReader` (iterator of `Result<Transaction, ReadError>`), `write_accounts`. | `csv`, `transaction`, `account` |
+| `error` | `EngineError`: why a well-formed transaction was refused. Shared by `account` and `engine`, so it sits apart from both. | `transaction` |
+| `account` | `Account`: balances, lock, `commit` (the only balance writer). | `amount`, `error` |
+| `engine` | `Engine` (one handler per transaction kind), `TxState`, `DisputeAction`, the deposit store. | `account`, `error`, `transaction` |
+| `io` | `TransactionReader` (iterator of `Result<Row, ReadError>`, each row carrying its row number), `write_accounts`. | `csv`, `transaction`, `account` |
 | `main` | Arguments, `AppError`, exit codes, diagnostics. | everything |
 
 ## Design rules
@@ -67,7 +68,7 @@ stderr, and writes accounts at the end.
 | Data | Structure | Bound |
 |---|---|---|
 | Accounts | `HashMap<ClientId, Account>` | At most 65 536 entries |
-| Deposits | `HashMap<TxId, Deposit { client, amount, state }>` | One per accepted deposit |
+| Deposits | `HashMap<TxId, Deposit { amount, client, state }>`, 16 bytes per entry | One per accepted deposit; see [scale.md](scale.md) |
 
 - Only deposits are stored, because only deposits can be disputed.
   Withdrawals, rejected rows and dispute-family rows leave no trace.
