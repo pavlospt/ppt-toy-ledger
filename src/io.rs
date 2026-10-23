@@ -40,13 +40,16 @@ pub struct TransactionReader<R: Read> {
     reader: csv::Reader<R>,
     headers: StringRecord,
     record: StringRecord,
+    trimmed: StringRecord,
     finished: bool,
 }
 
 impl<R: Read> TransactionReader<R> {
     pub fn new(input: R) -> Result<Self, HeaderError> {
+        // Fields are trimmed in `parse_record` instead: the csv crate's own
+        // field trimming allocates a new record for every row.
         let mut reader = csv::ReaderBuilder::new()
-            .trim(csv::Trim::All)
+            .trim(csv::Trim::Headers)
             .flexible(true)
             .from_reader(input);
         let headers = reader.headers().map_err(HeaderError::Read)?.clone();
@@ -62,6 +65,7 @@ impl<R: Read> TransactionReader<R> {
             reader,
             headers,
             record: StringRecord::new(),
+            trimmed: StringRecord::new(),
             finished: false,
         })
     }
@@ -72,12 +76,19 @@ impl<R: Read> TransactionReader<R> {
         self.record.position().map_or(0, csv::Position::line)
     }
 
-    fn parse_record(&self) -> Result<Transaction, RowError> {
+    fn parse_record(&mut self) -> Result<Transaction, RowError> {
         if self.record.len() > self.headers.len() {
             return Err(RowError::TooManyFields(self.record.len()));
         }
+        // Trimming into a second reused buffer keeps the per-row path free of
+        // allocations. ASCII whitespace only, matching the header trimming.
+        self.trimmed.clear();
+        for field in &self.record {
+            self.trimmed
+                .push_field(field.trim_matches(|c: char| c.is_ascii_whitespace()));
+        }
         let raw: RawRecord<'_> = self
-            .record
+            .trimmed
             .deserialize(Some(&self.headers))
             .map_err(RowError::Malformed)?;
         Ok(Transaction::try_from(raw)?)
@@ -91,17 +102,20 @@ impl<R: Read> Iterator for TransactionReader<R> {
         if self.finished {
             return None;
         }
-        // One record buffer is reused for the whole stream, so steady-state
+        // The record buffers are reused for the whole stream, so steady-state
         // reading does not allocate per row.
         match self.reader.read_record(&mut self.record) {
             Ok(false) => {
                 self.finished = true;
                 None
             }
-            Ok(true) => Some(self.parse_record().map_err(|reason| ReadError::Row {
-                line: self.line(),
-                reason,
-            })),
+            Ok(true) => {
+                let parsed = self.parse_record();
+                Some(parsed.map_err(|reason| ReadError::Row {
+                    line: self.line(),
+                    reason,
+                }))
+            }
             Err(error) if matches!(error.kind(), csv::ErrorKind::Io(_)) => {
                 self.finished = true;
                 Some(Err(ReadError::Io(error)))

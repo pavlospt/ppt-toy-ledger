@@ -202,16 +202,25 @@ CI runs `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` and
 
 ## Efficiency
 
-- The input is streamed, never loaded whole. One CSV record buffer is reused
-  for every row, and rows are decoded without copying their text.
+- The input is streamed, never loaded whole. Rows are decoded without copying
+  their text.
+- The per-row path doesn't allocate. The CSV record buffers are reused for every
+  row, and fields are trimmed by hand into one of them. The csv crate's own
+  field trimming allocates a new record per row; replacing it halved the run
+  time.
 - Memory grows only with the number of stored deposits.
 
-Measured with the release build on an Apple Silicon laptop (`/usr/bin/time -l`):
+Measured with the release build on an Apple Silicon laptop (`/usr/bin/time -l`,
+median of three runs):
 
 | Input | Time | Peak memory |
 |---|---|---|
-| 10 M rows of mixed generated transactions (`cargo run --release --example generate -- 10000000`) | 4.0 s | 55 MB |
-| 10 M deposits, all accepted and stored (worst case for memory) | 3.9 s | 842 MB |
+| 10 M rows of mixed generated transactions (`cargo run --release --example generate -- 10000000`) | 1.9 s | 55 MB |
+| 10 M deposits, all accepted and stored (worst case for memory) | 1.7 s | 841 MB |
+
+After this change, parsing the CSV text accounts for only about a tenth of the
+run time. The rest is spread across amount parsing, hash-map work and
+validation, so a SIMD CSV parser would add little.
 
 In the mixed input, chargebacks soon lock most accounts, so later deposits are
 rejected and never stored. That's why its memory is so much lower.
