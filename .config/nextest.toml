@@ -1,0 +1,12 @@
+# Every test runs in its own process, so unit, property and CLI tests all run
+# in parallel across cores.
+
+[profile.default]
+# Property tests and CLI tests are the slowest; flag anything unusually slow
+# rather than letting a hung test stall the run.
+slow-timeout = { period = "30s", terminate-after = 4 }
+
+[profile.ci]
+# Report every failure in one run instead of stopping at the first.
+fail-fast = false
+failure-output = "immediate-final"

@@ -206,7 +206,7 @@ mod fatal_errors {
     }
 }
 
-// Run with `cargo test --release -- --ignored large_input`.
+// Run with `cargo nextest run --release --run-ignored only -E 'test(large_input)'`.
 #[test]
 #[ignore = "slow: streams a million generated rows through the binary"]
 fn large_input_streams_successfully() {
