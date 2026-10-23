@@ -6,7 +6,7 @@ use thiserror::Error;
 // Money is a fixed-point integer in 1/10_000 units rather than a float or a
 // general decimal: four places is the whole precision contract, so the type
 // enforces it, and an 8-byte value keeps the per-deposit store small.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct Amount(i64);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]

@@ -6,7 +6,7 @@ use crate::amount::{Amount, AmountError};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ClientId(pub u16);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TxId(pub u32);
 
 // Each variant carries exactly the fields it needs, so a deposit without an
@@ -48,6 +48,17 @@ impl Transaction {
         }
     }
 
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Transaction::Deposit { .. } => "deposit",
+            Transaction::Withdrawal { .. } => "withdrawal",
+            Transaction::Dispute { .. } => "dispute",
+            Transaction::Resolve { .. } => "resolve",
+            Transaction::Chargeback { .. } => "chargeback",
+        }
+    }
+
+    #[cfg(test)]
     pub fn tx(&self) -> TxId {
         match *self {
             Transaction::Deposit { tx, .. }
@@ -294,6 +305,15 @@ mod tests {
         let tx = Transaction::try_from(record).unwrap();
         assert_eq!(tx.client(), ClientId(u16::MAX));
         assert_eq!(tx.tx(), TxId(u32::MAX));
+    }
+
+    #[test]
+    fn names_each_kind_as_written_in_the_input() {
+        for kind in ["deposit", "withdrawal", "dispute", "resolve", "chargeback"] {
+            let amount = matches!(kind, "deposit" | "withdrawal").then_some("1");
+            let tx = Transaction::try_from(raw(kind, amount)).unwrap();
+            assert_eq!(tx.kind(), kind);
+        }
     }
 
     #[test]

@@ -73,9 +73,9 @@ fn run(mut args: impl Iterator<Item = OsString>) -> Result<(), AppError> {
                 if let Err(error) = engine.apply(tx) {
                     let _ = writeln!(
                         diagnostics,
-                        "line {}: transaction {} rejected: {error}",
+                        "line {}: {} rejected: {error}",
                         transactions.line(),
-                        tx.tx().0
+                        tx.kind()
                     );
                 }
             }

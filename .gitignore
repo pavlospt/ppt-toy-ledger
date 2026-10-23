@@ -1,6 +1,6 @@
 /target
 
-# Challenge documents must never be committed.
+# Reference documents are kept out of the repository.
 *.pdf
 
 # Local tooling state

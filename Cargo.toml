@@ -3,6 +3,8 @@ name = "ppt-ledger"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.99.1"
+description = "Streaming payments engine: applies a CSV of transactions to client accounts"
+publish = false
 
 [dependencies]
 csv = "1.4.0"

@@ -6,7 +6,7 @@ use thiserror::Error;
 use crate::account::Account;
 use crate::transaction::{ClientId, ParseError, RawRecord, Transaction};
 
-pub const REQUIRED_COLUMNS: [&str; 4] = ["type", "client", "tx", "amount"];
+const REQUIRED_COLUMNS: [&str; 4] = ["type", "client", "tx", "amount"];
 
 #[derive(Debug, Error)]
 pub enum HeaderError {
