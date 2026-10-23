@@ -86,11 +86,44 @@ impl Engine {
     }
 
     pub fn apply(&mut self, tx: Transaction) -> Result<(), EngineError> {
-        todo!()
+        // Any well-formed row opens an account for its client, even if the
+        // transaction is then rejected: the first reference creates the record.
+        let account = self.accounts.entry(tx.client()).or_default();
+
+        match tx {
+            Transaction::Deposit { client, tx, amount } => {
+                if self.deposits.contains_key(&tx) {
+                    return Err(EngineError::DuplicateTx(tx));
+                }
+                account.deposit(amount)?;
+                self.deposits.insert(
+                    tx,
+                    Deposit {
+                        client,
+                        amount,
+                        state: TxState::Processed,
+                    },
+                );
+                Ok(())
+            }
+            // Withdrawal IDs are not stored, so only a collision with a known
+            // deposit is detected; IDs are unique by contract and keeping every
+            // withdrawal would grow memory for transactions that can never be
+            // disputed.
+            Transaction::Withdrawal { tx, amount, .. } => {
+                if self.deposits.contains_key(&tx) {
+                    return Err(EngineError::DuplicateTx(tx));
+                }
+                account.withdraw(amount)
+            }
+            Transaction::Dispute { .. }
+            | Transaction::Resolve { .. }
+            | Transaction::Chargeback { .. } => todo!(),
+        }
     }
 
     pub fn account(&self, client: ClientId) -> Option<&Account> {
-        todo!()
+        self.accounts.get(&client)
     }
 
     pub fn accounts(&self) -> impl Iterator<Item = (ClientId, &Account)> {

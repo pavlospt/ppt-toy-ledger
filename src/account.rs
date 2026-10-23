@@ -22,7 +22,11 @@ impl Account {
     }
 
     pub fn total(&self) -> Amount {
-        todo!()
+        // Infallible: `commit` is the only writer of `available` and `held`,
+        // and it refuses any pair whose sum does not fit.
+        self.available
+            .checked_add(self.held)
+            .expect("available + held is checked on every mutation")
     }
 
     pub fn is_locked(&self) -> bool {
@@ -30,11 +34,16 @@ impl Account {
     }
 
     pub fn deposit(&mut self, amount: Amount) -> Result<(), EngineError> {
-        todo!()
+        self.ensure_unlocked()?;
+        self.commit(self.available.checked_add(amount), Some(self.held))
     }
 
     pub fn withdraw(&mut self, amount: Amount) -> Result<(), EngineError> {
-        todo!()
+        self.ensure_unlocked()?;
+        if self.available < amount {
+            return Err(EngineError::InsufficientFunds);
+        }
+        self.commit(self.available.checked_sub(amount), Some(self.held))
     }
 
     // Moves funds from available to held. Available may go negative when the
@@ -50,6 +59,33 @@ impl Account {
 
     pub fn charge_back(&mut self, amount: Amount) -> Result<(), EngineError> {
         todo!()
+    }
+
+    // A locked account is frozen to the client only. Dispute settlement is
+    // driven by the bank and keeps working, so only deposit and withdraw call
+    // this.
+    fn ensure_unlocked(&self) -> Result<(), EngineError> {
+        if self.locked {
+            Err(EngineError::AccountLocked)
+        } else {
+            Ok(())
+        }
+    }
+
+    fn commit(
+        &mut self,
+        available: Option<Amount>,
+        held: Option<Amount>,
+    ) -> Result<(), EngineError> {
+        let (Some(available), Some(held)) = (available, held) else {
+            return Err(EngineError::Overflow);
+        };
+        if available.checked_add(held).is_none() {
+            return Err(EngineError::Overflow);
+        }
+        self.available = available;
+        self.held = held;
+        Ok(())
     }
 }
 
